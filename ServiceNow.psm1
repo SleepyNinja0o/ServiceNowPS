@@ -1,4 +1,109 @@
+<#
+Incident States:
+New         1
+In Progress 2
+On Hold     3
+Resolved    6
+Closed      7
+Canceled    8
+
+SCTASK States:
+Pending           -5
+Open              1
+Work in Progress  2
+Closed Complete   3
+Closed Incomplete 4
+Closed Skipped    7
+#>
+
 $Global:ServiceNow_Server = "https://*****.service-now.com"
+
+function Add-ServiceNowAttachment{
+param(
+[Parameter(Mandatory)]
+[ValidateSet("sc_task","incident")]
+$TicketType,
+[Parameter(Mandatory)]
+$TicketSysID,
+$File,
+[switch]$SkipVerification
+)
+    if (!$ServiceNow_Session){Confirm-ServiceNowSession}
+
+        #Upload Attachment to Ticket in ServiceNow
+        if($File -ne "" -and $File -ne $null){
+            $FileOb = Get-Item $File
+            $SN_Attachment_File = @{
+                'SafeFileName' = $FileOb.FullName.substring($FileOb.FullName.LastIndexOf("\")+1)
+                'FileName' = $FileOb.FullName
+            }
+        }else{
+            $SN_Attachment_File = Get-File
+        }
+        $SN_Attachment_FileName = $SN_Attachment_File.SafeFileName
+        $SN_Attachment_Table_Name = $TicketType
+        $SN_Attachment_Table_Sys_Id = $TicketSysID
+        $SN_Attachment_Content_Type = Get-MimeType $SN_Attachment_File.FileName
+        $SN_Attachment_Payload_File = $SN_Attachment_File.FileName
+        $SN_Attachment_Payload_File_Bin = [IO.File]::ReadAllBytes($SN_Attachment_Payload_File)
+        $SN_Attachment_Encoding = [System.Text.Encoding]::GetEncoding("iso-8859-1")
+        $SN_Attachment_Payload_File_Encoding = $SN_Attachment_Encoding.GetString($SN_Attachment_Payload_File_Bin)
+        $SN_Attachment_GUID = ((New-Guid).Guid | Out-String).Trim()
+        $LF = "`r`n"
+        $SN_Attachment_Body = (
+            "-----------------------------$SN_Attachment_GUID",
+            "Content-Disposition: form-data; name=`"sysparm_ck`"",
+            "",
+            $SN_User_Token,
+            "-----------------------------$SN_Attachment_GUID",
+            "Content-Disposition: form-data; name=`"attachments_modified`"",
+            "",
+            "",
+            "-----------------------------$SN_Attachment_GUID",
+            "Content-Disposition: form-data; name=`"sysparm_sys_id`"",
+            "",
+            $SN_Attachment_Table_Sys_Id,
+            "-----------------------------$SN_Attachment_GUID",
+            "Content-Disposition: form-data; name=`"sysparm_table`"",
+            "",
+            $SN_Attachment_Table_Name,
+            "-----------------------------$SN_Attachment_GUID",
+            "Content-Disposition: form-data; name=`"max_size`"",
+            "",
+            "1024",
+            "-----------------------------$SN_Attachment_GUID",
+            "Content-Disposition: form-data; name=`"file_types`"",
+            "",
+            "",
+            "-----------------------------$SN_Attachment_GUID",
+            "Content-Disposition: form-data; name=`"sysparm_nostack`"",
+            "",
+            "yes",
+            "-----------------------------$SN_Attachment_GUID",
+            "Content-Disposition: form-data; name=`"sysparm_redirect`"",
+            "",
+            "attachment_uploaded.do?sysparm_domain_restore=false&sysparm_nostack=yes",
+            "-----------------------------$SN_Attachment_GUID",
+            "Content-Disposition: form-data; name=`"sysparm_encryption_context`"",
+            "",
+            "",
+            "-----------------------------$SN_Attachment_GUID",
+            "Content-Disposition: form-data; name=`"attachFile`"; filename=`"$SN_Attachment_FileName`"",
+            "Content-Type: $SN_Attachment_Content_Type",
+            "",
+            $SN_Attachment_Payload_File_Encoding,
+            "-----------------------------$SN_Attachment_GUID--",
+            ""
+        ) -join $LF
+
+    $global:SN_Submit_Attachment = Invoke-WebRequest -Uri "https://$ServiceNow_Server/sys_attachment.do?sysparm_record_scope=global" -Method "POST" -ContentType "multipart/form-data; boundary=---------------------------$SN_Attachment_GUID" -Body $SN_Attachment_Body -WebSession $ServiceNow_Session
+    if ($SN_Submit_Attachment.StatusCode -eq "200") {
+        #$INC_ID = $Submit_INC_2.number
+        Write-Host "*** Successfully Submitted Attachment `"$SN_Attachment_FileName`" for Ticket $TicketSysID ***" -ForegroundColor Green
+    }else{
+        Write-Host "File attachment upload failed!`nStatus: $($SN_Submit_Attachment.StatusCode)`n"
+    }
+}
 
 function Close-ServiceNowIncident{
 param(
@@ -36,14 +141,9 @@ function Close-ServiceNowSession{
     if($ServiceNow_Session_Timer){$ServiceNow_Session_Timer.enabled = $false}
     Remove-Variable -Name "ServiceNow_*", "SN_*" -ErrorAction SilentlyContinue
 }
-
-function New-SNSessionRefresher{
-    $global:ServiceNow_Session_Timer = New-Object System.Timers.Timer
-
-    $Action = {
-        $global:ServiceNow_Session_Expires = ($ServiceNow_Session.Cookies.GetCookies("https://$ServiceNow_Server") | where {$_.Name -eq "glide_session_store"}).Expires
-        $ServiceNow_Session_Expires_Minutes = (New-TimeSpan -Start (Get-Date) -End $ServiceNow_Session_Expires).Minutes
-
+    
+function Confirm-ServiceNowSession{
+    if($ServiceNow_Session){
         $SN_User_Profile_Page_Refresh = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session).records
         $SN_DisplayName_Refresh = $SN_User_Profile_Page_Refresh.name
 
@@ -55,10 +155,8 @@ function New-SNSessionRefresher{
         }
     }
 
-    $global:ServiceNow_Session_Timer_Event = Register-ObjectEvent -InputObject $ServiceNow_Session_Timer -EventName Elapsed -Action $Action
-    $ServiceNow_Session_Timer.Interval = 570000
-    $ServiceNow_Session_Timer.AutoReset = $True
-    $ServiceNow_Session_Timer.Enabled = $True
+    Write-Host "Service Now session not found!" -ForegroundColor Red
+    New-ServiceNowSession
 }
 
 function Get-AuthCertificate {
@@ -672,6 +770,30 @@ function New-ServiceNowSession{
     }
 }
 
+function New-SNSessionRefresher{
+    $global:ServiceNow_Session_Timer = New-Object System.Timers.Timer
+
+    $Action = {
+        $global:ServiceNow_Session_Expires = ($ServiceNow_Session.Cookies.GetCookies("https://$ServiceNow_Server") | where {$_.Name -eq "glide_session_store"}).Expires
+        $ServiceNow_Session_Expires_Minutes = (New-TimeSpan -Start (Get-Date) -End $ServiceNow_Session_Expires).Minutes
+
+        $SN_User_Profile_Page_Refresh = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session).records
+        $SN_DisplayName_Refresh = $SN_User_Profile_Page_Refresh.name
+
+        if($SN_DisplayName -ne $SN_DisplayName_Refresh){
+            Write-Host "Service Now session expired! Refreshing..." -ForegroundColor Yellow
+            $ServiceNow_Session_Timer.Enabled = $False
+            Unregister-Event -SubscriptionId ($ServiceNow_Session_Timer_Event.Id)
+            New-ServiceNowSession
+        }
+    }
+
+    $global:ServiceNow_Session_Timer_Event = Register-ObjectEvent -InputObject $ServiceNow_Session_Timer -EventName Elapsed -Action $Action
+    $ServiceNow_Session_Timer.Interval = 570000
+    $ServiceNow_Session_Timer.AutoReset = $True
+    $ServiceNow_Session_Timer.Enabled = $True
+}
+
 function Search-Customer{
 param($Name)
     $wr = Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" `
@@ -736,113 +858,12 @@ function Update-ServiceNowServices {
     Write-Host "Service Now Services JSON file updated successfully!" -ForegroundColor Green
 }
 
-function Add-ServiceNowAttachment{
-param(
-[Parameter(Mandatory)]
-[ValidateSet("sc_task","incident")]
-$TicketType,
-[Parameter(Mandatory)]
-$TicketSysID,
-$File,
-[switch]$SkipVerification
-)
-    if (!$ServiceNow_Session){Confirm-ServiceNowSession}
-
-        #Upload Attachment to Ticket in ServiceNow
-        if($File -ne "" -and $File -ne $null){
-            $FileOb = Get-Item $File
-            $SN_Attachment_File = @{
-                'SafeFileName' = $FileOb.FullName.substring($FileOb.FullName.LastIndexOf("\")+1)
-                'FileName' = $FileOb.FullName
-            }
-        }else{
-            $SN_Attachment_File = Get-File
-        }
-        $SN_Attachment_FileName = $SN_Attachment_File.SafeFileName
-        $SN_Attachment_Table_Name = $TicketType
-        $SN_Attachment_Table_Sys_Id = $TicketSysID
-        $SN_Attachment_Content_Type = Get-MimeType $SN_Attachment_File.FileName
-        $SN_Attachment_Payload_File = $SN_Attachment_File.FileName
-        $SN_Attachment_Payload_File_Bin = [IO.File]::ReadAllBytes($SN_Attachment_Payload_File)
-        $SN_Attachment_Encoding = [System.Text.Encoding]::GetEncoding("iso-8859-1")
-        $SN_Attachment_Payload_File_Encoding = $SN_Attachment_Encoding.GetString($SN_Attachment_Payload_File_Bin)
-        $SN_Attachment_GUID = ((New-Guid).Guid | Out-String).Trim()
-        $LF = "`r`n"
-        $SN_Attachment_Body = (
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"sysparm_ck`"",
-            "",
-            $SN_User_Token,
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"attachments_modified`"",
-            "",
-            "",
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"sysparm_sys_id`"",
-            "",
-            $SN_Attachment_Table_Sys_Id,
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"sysparm_table`"",
-            "",
-            $SN_Attachment_Table_Name,
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"max_size`"",
-            "",
-            "1024",
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"file_types`"",
-            "",
-            "",
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"sysparm_nostack`"",
-            "",
-            "yes",
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"sysparm_redirect`"",
-            "",
-            "attachment_uploaded.do?sysparm_domain_restore=false&sysparm_nostack=yes",
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"sysparm_encryption_context`"",
-            "",
-            "",
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"attachFile`"; filename=`"$SN_Attachment_FileName`"",
-            "Content-Type: $SN_Attachment_Content_Type",
-            "",
-            $SN_Attachment_Payload_File_Encoding,
-            "-----------------------------$SN_Attachment_GUID--",
-            ""
-        ) -join $LF
-
-    $global:SN_Submit_Attachment = Invoke-WebRequest -Uri "https://$ServiceNow_Server/sys_attachment.do?sysparm_record_scope=global" -Method "POST" -ContentType "multipart/form-data; boundary=---------------------------$SN_Attachment_GUID" -Body $SN_Attachment_Body -WebSession $ServiceNow_Session
-    if ($SN_Submit_Attachment.StatusCode -eq "200") {
-        #$INC_ID = $Submit_INC_2.number
-        Write-Host "*** Successfully Submitted Attachment `"$SN_Attachment_FileName`" for Ticket $TicketSysID ***" -ForegroundColor Green
-    }else{
-        Write-Host "File attachment upload failed!`nStatus: $($SN_Submit_Attachment.StatusCode)`n"
-    }
-}
-
-function Confirm-ServiceNowSession{
-    if($ServiceNow_Session){
-        $SN_User_Profile_Page_Refresh = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session).records
-        $SN_DisplayName_Refresh = $SN_User_Profile_Page_Refresh.name
-
-        if($SN_DisplayName -ne $SN_DisplayName_Refresh){
-            Write-Host "Service Now session expired! Refreshing..." -ForegroundColor Yellow
-            $ServiceNow_Session_Timer.Enabled = $False
-            Unregister-Event -SubscriptionId ($ServiceNow_Session_Timer_Event.Id)
-            New-ServiceNowSession
-        }
-    }
-
-    Write-Host "Service Now session not found!" -ForegroundColor Red
-    New-ServiceNowSession
-}
 
 
+Export-ModuleMember -Function Add-ServiceNowAttachment
 Export-ModuleMember -Function Close-ServiceNowIncident
 Export-ModuleMember -Function Close-ServiceNowSession
+Export-ModuleMember -Function Confirm-ServiceNowSession
 Export-ModuleMember -Function Get-ServiceNowCategories
 Export-ModuleMember -Function Get-ServiceNowGroups
 Export-ModuleMember -Function Get-ServiceNowRecord
@@ -853,8 +874,6 @@ Export-ModuleMember -Function New-ServiceNowSession
 Export-ModuleMember -Function Update-ServiceNowCategories
 Export-ModuleMember -Function Update-ServiceNowGroups
 Export-ModuleMember -Function Update-ServiceNowServices
-Export-ModuleMember -Function Add-ServiceNowAttachment
-Export-ModuleMember -Function Confirm-ServiceNowSession
 
 
 <#
