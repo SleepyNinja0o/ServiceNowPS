@@ -1,6 +1,6 @@
 $Global:ServiceNow_Server = "https://*****.service-now.com"
 
-function Cancel-ServiceNowIncident{
+function Close-ServiceNowIncident{
 param(
 $SysID
 )
@@ -21,7 +21,7 @@ $SysID
             if($RetryCount -eq 3){
                 if(!$ReAuthTried){
                     Write-Host "Failed to submit ticket 3 times in a row...Verifying Session & Authentication status!" -ForegroundColor Red
-                    Verify-ServiceNowSession
+                    Confirm-ServiceNowSession
                     $ReAuthTried = $True
                 }
             }
@@ -32,13 +32,12 @@ $SysID
 }
 
 function Close-ServiceNowSession{
-    $Global:ReAuthTried = $False
     Get-EventSubscriber -Force | Unregister-Event -Force
     if($ServiceNow_Session_Timer){$ServiceNow_Session_Timer.enabled = $false}
     Remove-Variable -Name "ServiceNow_*", "SN_*" -ErrorAction SilentlyContinue
 }
 
-function Create-SNSessionRefresher{
+function New-SNSessionRefresher{
     $global:ServiceNow_Session_Timer = New-Object System.Timers.Timer
 
     $Action = {
@@ -176,7 +175,7 @@ $TicketNumber,
 [Parameter(Mandatory=$false)]
 $TicketSearch
 )
-    if (!$ServiceNow_Session){Verify-ServiceNowSession}
+    if (!$ServiceNow_Session){Confirm-ServiceNowSession}
 
     switch ($RecordType.toLower()){
         "user" {
@@ -457,7 +456,7 @@ $File="",
                 if($RetryCount -eq 3){
                     if(!$ReAuthTried){
                         Write-Host "Failed to submit ticket 3 times in a row...Verifying Session!" -ForegroundColor Red
-                        Verify-ServiceNowSession
+                        Confirm-ServiceNowSession
                         $ReAuthTried = $True
                     }
                 }
@@ -471,9 +470,9 @@ $File="",
             Write-Host "*** Successfully Submitted `"$INC_SysID`" to ServiceNow ***`n" -ForegroundColor Green
             if($UploadAttachment.IsPresent){
                 if($File -ne "" -and $File -ne $null){
-                    Upload-ServiceNowAttachment -TicketType 'incident' -TicketSysID $INC_SysID -File $File
+                    Add-ServiceNowAttachment -TicketType 'incident' -TicketSysID $INC_SysID -File $File
                 }else{
-                    Upload-ServiceNowAttachment -TicketType 'incident' -TicketSysID $INC_SysID
+                    Add-ServiceNowAttachment -TicketType 'incident' -TicketSysID $INC_SysID
                 }
             }
             return "$INC_Number,$INC_SysID"
@@ -602,7 +601,7 @@ $File="",
                     if($RetryCount -eq 3){
                         if(!$ReAuthTried){
                             Write-Host "Failed to submit ticket 3 times in a row...Verifying Session & Authentication status!" -ForegroundColor Red
-                            Verify-ServiceNowSession
+                            Confirm-ServiceNowSession
                             $ReAuthTried = $True
                         }
                     }
@@ -623,9 +622,9 @@ $File="",
                 Write-Host "*** Successfully Submitted `"$SCTask_Number`" to ServiceNow ***" -ForegroundColor Green
                 if($UploadAttachment.IsPresent){
                     if($File -ne "" -and $File -ne $null){
-                        Upload-ServiceNowAttachment -TicketType 'sc_task' -TicketSysID $SCTask_SysID -File $File
+                        Add-ServiceNowAttachment -TicketType 'sc_task' -TicketSysID $SCTask_SysID -File $File
                     }else{
-                        Upload-ServiceNowAttachment -TicketType 'sc_task' -TicketSysID $SCTask_SysID
+                        Add-ServiceNowAttachment -TicketType 'sc_task' -TicketSysID $SCTask_SysID
                     }
                 }
 
@@ -666,7 +665,7 @@ function New-ServiceNowSession{
         Write-Host "Connected to Service Now!`n" -ForegroundColor Green
         $global:ServiceNow_Session_Expires = ($ServiceNow_Session.Cookies.GetCookies("https://$ServiceNow_Server") | where {$_.Name -eq "glide_session_store"}).Expires
         $global:ServiceNow_Session_Expires_Minutes = New-TimeSpan -Start (Get-Date) -End $ServiceNow_Session_Expires
-        Create-SNSessionRefresher
+        New-SNSessionRefresher
     }else{
         Write-Host "Authentication to Service Now failed!" -ForegroundColor Red
         $global:ServiceNow_Session = $null
@@ -682,10 +681,11 @@ param($Name)
       "X-UserToken"=$SN_User_Token
     } `
     -ContentType "application/x-www-form-urlencoded; charset=UTF-8" `
-    -Body "sysparm_processor=Reference&sysparm_scope=global&sysparm_want_session_messages=true&ni.nolog.x_referer=ignore&sysparm_name=incident.caller_id&sysparm_max=15&sysparm_chars=$Name&sysparm_value=&ac_columns=user_name;u_district;email&ac_order_by=name"}
+    -Body "sysparm_processor=Reference&sysparm_scope=global&sysparm_want_session_messages=true&ni.nolog.x_referer=ignore&sysparm_name=incident.caller_id&sysparm_max=15&sysparm_chars=$Name&sysparm_value=&ac_columns=user_name;u_district;email&ac_order_by=name"
+}
 
 function Update-ServiceNowCategories {
-    Verify-ServiceNowSession
+    Confirm-ServiceNowSession
 
     $global:ServiceNowCATsFilePath = "$($PSScriptRoot)\ServiceNow_Categories.json"
     $i = 0
@@ -721,7 +721,7 @@ function Update-ServiceNowCategories {
 }
 
 function Update-ServiceNowGroups {
-    Verify-ServiceNowSession
+    Confirm-ServiceNowSession
 
     $global:ServiceNowGroupsFilePath = "$($PSScriptRoot)\ServiceNow_Groups.json"
     (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user_group_list.do?JSONv2" -WebSession $ServiceNow_Session).records | where {$_.name -ne "" -and $_.name -ne $null} | select name,sys_id,manager | sort name | ConvertTo-Json | Out-File $ServiceNowGroupsFilePath -Force
@@ -729,14 +729,14 @@ function Update-ServiceNowGroups {
 }
 
 function Update-ServiceNowServices {
-    Verify-ServiceNowSession
+    Confirm-ServiceNowSession
 
     $global:ServiceNowServicesFilePath = "$($PSScriptRoot)\ServiceNow_Groups.json"
     $ServiceNow_Services = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/cmdb_ci_service_list.do?JSONv2&sysparm_target=incident.business_service" -WebSession $ServiceNow_Session -Headers @{"X-UserToken"=$SN_User_Token}).records | where {$_.name -ne "" -and $_.name -ne $null} | select name,sys_id | sort name | ConvertTo-Json | Out-File $ServiceNowServicesFilePath -Force
     Write-Host "Service Now Services JSON file updated successfully!" -ForegroundColor Green
 }
 
-function Upload-ServiceNowAttachment{
+function Add-ServiceNowAttachment{
 param(
 [Parameter(Mandatory)]
 [ValidateSet("sc_task","incident")]
@@ -746,7 +746,7 @@ $TicketSysID,
 $File,
 [switch]$SkipVerification
 )
-    if (!$ServiceNow_Session){Verify-ServiceNowSession}
+    if (!$ServiceNow_Session){Confirm-ServiceNowSession}
 
         #Upload Attachment to Ticket in ServiceNow
         if($File -ne "" -and $File -ne $null){
@@ -823,7 +823,7 @@ $File,
     }
 }
 
-function Verify-ServiceNowSession{
+function Confirm-ServiceNowSession{
     if($ServiceNow_Session){
         $SN_User_Profile_Page_Refresh = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session).records
         $SN_DisplayName_Refresh = $SN_User_Profile_Page_Refresh.name
@@ -841,7 +841,7 @@ function Verify-ServiceNowSession{
 }
 
 
-Export-ModuleMember -Function Cancel-ServiceNowIncident
+Export-ModuleMember -Function Close-ServiceNowIncident
 Export-ModuleMember -Function Close-ServiceNowSession
 Export-ModuleMember -Function Get-ServiceNowCategories
 Export-ModuleMember -Function Get-ServiceNowGroups
@@ -853,8 +853,8 @@ Export-ModuleMember -Function New-ServiceNowSession
 Export-ModuleMember -Function Update-ServiceNowCategories
 Export-ModuleMember -Function Update-ServiceNowGroups
 Export-ModuleMember -Function Update-ServiceNowServices
-Export-ModuleMember -Function Upload-ServiceNowAttachment
-Export-ModuleMember -Function Verify-ServiceNowSession
+Export-ModuleMember -Function Add-ServiceNowAttachment
+Export-ModuleMember -Function Confirm-ServiceNowSession
 
 
 <#
