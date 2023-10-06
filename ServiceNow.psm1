@@ -740,11 +740,14 @@ $File="",
 
 function New-ServiceNowSession{
 param(
+    $Server,
     $Username,
     $Pass,
     [switch]$DoD
 )
     Close-ServiceNowSession
+
+    if($Global:ServiceNow_Server -match "\*" -and $Server){$Global:ServiceNow_Server = $Server}
 
     Write-Host "Connecting to Service Now..." -ForegroundColor Yellow
     $SN_Login_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/" -SessionVariable global:ServiceNow_Session
