@@ -778,9 +778,10 @@ param(
     $global:SN_DisplayName = $SN_User_Profile_Page.name
     $global:SN_UserName = $SN_User_Profile_Page.user_name
     $global:SN_LocationID = $SN_User_Profile_Page.location
-
     #$global:SN_Location_Name = ((Invoke-WebRequest -Uri "https://$ServiceNow_Server/cmn_location.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_LocationID" -WebSession $ServiceNow_Session).Content | ConvertFrom-JSON).records.name
     $global:SN_Location_Name = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" -Method "POST" -WebSession $ServiceNow_Session -Headers @{"X-UserToken"=$SN_User_Token} -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=AjaxClientHelper&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=getDisplay&sysparm_table=cmn_location&sysparm_value=$SN_LocationID&sysparm_synch=true&ni.nolog.x_referer=ignore").xml.answer
+
+    Write-Host "Display Name: $SN_DisplayName`nUsername: $SN_UserName`nLocation: $SN_Location_Name" -ForegroundColor Green
 
     if($SN_Banner_Page.StatusCode -eq 200){
         Write-Host "Connected to Service Now!`n" -ForegroundColor Green
@@ -798,7 +799,7 @@ function New-SNSessionRefresher{
 
     $Action = {
         $global:ServiceNow_Session_Expires = ($ServiceNow_Session.Cookies.GetCookies("https://$ServiceNow_Server") | where {$_.Name -eq "glide_session_store"}).Expires
-        $ServiceNow_Session_Expires_Minutes = (New-TimeSpan -Start (Get-Date) -End $ServiceNow_Session_Expires).Minutes
+        $global:ServiceNow_Session_Expires_Minutes = (New-TimeSpan -Start (Get-Date) -End $ServiceNow_Session_Expires).Minutes
 
         $SN_User_Profile_Page_Refresh = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session).records
         $SN_DisplayName_Refresh = $SN_User_Profile_Page_Refresh.name
