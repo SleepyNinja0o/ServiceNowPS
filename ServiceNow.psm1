@@ -139,7 +139,7 @@ $SysID
 function Close-ServiceNowSession{
     Get-EventSubscriber -Force | Unregister-Event -Force
     if($ServiceNow_Session_Timer){$ServiceNow_Session_Timer.enabled = $false}
-    Remove-Variable -Name "ServiceNow_*", "SN_*" -ErrorAction SilentlyContinue
+    Remove-Variable -Name "ServiceNow_*", "SN_*" -Scope Global -ErrorAction SilentlyContinue
 }
     
 function Confirm-ServiceNowSession{
@@ -751,16 +751,14 @@ param(
         return
     }elseif($Global:ServiceNow_Server -match "\*" -and $Server){
         if($Server -match "http|https"){
-            $server = ($Server -replace "(https://|http://)","" -replace "/","")
+            $Server = ($Server -replace "(https://|http://)","" -replace "/","")
         }
         $Global:ServiceNow_Server = $Server
     }
 
-    Close-ServiceNowSession
-
-    Write-Host "Connecting to Service Now..." -ForegroundColor Yellow
+    Write-Host "Connecting to $ServiceNow_Server..." -ForegroundColor Yellow
     try{
-        $SN_Login_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/" -SessionVariable global:ServiceNow_Session -ErrorAction Stop
+        $SN_Login_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server" -SessionVariable global:ServiceNow_Session -ErrorAction Stop
         if($SN_Login_Page.StatusCode -ne 200){
             Write-Host "Connection to ServiceNow failed!`nStatus Code: $($SN_Login_Page.StatusCode)"
             return
