@@ -747,10 +747,20 @@ param(
 )
     Close-ServiceNowSession
 
-    if($Global:ServiceNow_Server -match "\*" -and $Server){$Global:ServiceNow_Server = $Server}
+    if($Global:ServiceNow_Server -match "\*" -and $Server){
+        if($Server -match "http|https"){
+            $server = ($Server -replace "(https://|http://)","" -replace "/","")
+        }
+        $Global:ServiceNow_Server = $Server
+    }
 
     Write-Host "Connecting to Service Now..." -ForegroundColor Yellow
-    $SN_Login_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/" -SessionVariable global:ServiceNow_Session
+    try{
+        $SN_Login_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/" -SessionVariable global:ServiceNow_Session
+    }catch{
+        Write-Host "Connection to ServiceNow server failed!" -ForegroundColor Red
+    }
+
     if ($SN_Login_Page.Content -match "var g_ck = '(.*)'") {$SN_GCK_Token = $matches[1];write-host "Found G_CK Token: $SN_GCK_Token" -ForegroundColor Green}
     
     if($Username -and $Pass){
