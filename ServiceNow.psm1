@@ -153,10 +153,10 @@ function Confirm-ServiceNowSession{
             Unregister-Event -SubscriptionId ($ServiceNow_Session_Timer_Event.Id)
             New-ServiceNowSession
         }
+    }else{
+        Write-Host "Service Now session not found!" -ForegroundColor Red
+        New-ServiceNowSession
     }
-
-    Write-Host "Service Now session not found!" -ForegroundColor Red
-    New-ServiceNowSession
 }
 
 function Get-AuthCertificate {
@@ -743,69 +743,81 @@ param(
     $Server,
     $Username,
     $Pass,
+    [switch]$CertificateAuth,
     [switch]$DoD
 )
-    Close-ServiceNowSession
-
-    if($Global:ServiceNow_Server -match "\*" -and $Server){
+    if($Global:ServiceNow_Server -match "\*" -and !$Server){
+        Write-Host "No server was provided for ServiceNow connection!" -ForegroundColor Red
+        return
+    }elseif($Global:ServiceNow_Server -match "\*" -and $Server){
         if($Server -match "http|https"){
             $server = ($Server -replace "(https://|http://)","" -replace "/","")
         }
         $Global:ServiceNow_Server = $Server
     }
 
+    Close-ServiceNowSession
+
     Write-Host "Connecting to Service Now..." -ForegroundColor Yellow
     try{
-        $SN_Login_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/" -SessionVariable global:ServiceNow_Session
+        $SN_Login_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/" -SessionVariable global:ServiceNow_Session -ErrorAction Stop
+        if($SN_Login_Page.StatusCode -ne 200){
+            Write-Host "Connection to ServiceNow failed!`nStatus Code: $($SN_Login_Page.StatusCode)"
+            return
+        }
     }catch{
-        Write-Host "Connection to ServiceNow server failed!" -ForegroundColor Red
+        Write-Host "Connection to ServiceNow failed!`nError: $($_.Exception.Message)" -ForegroundColor Red
+        return
     }
 
     if ($SN_Login_Page.Content -match "var g_ck = '(.*)'") {$SN_GCK_Token = $matches[1];write-host "Found G_CK Token: $SN_GCK_Token" -ForegroundColor Green}
     
-    if($Username -and $Pass){
-        $SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/login.do" -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body @{
-            "sysparm_ck" = $SN_GCK_Token
-            "user_name" = $Username
-            "user_password" = $Pass
-            "not_important"=$null
-            "ni.nolog.user_password" = $true
-            "ni.noecho.user_name" = $true
-            "ni.noecho.user_password" = $true
-            "sys_action" = "sysverb_login"
-            "sysparm_login_url" = "welcome.do"} -WebSession $ServiceNow_Session
-    }elseif($DoD -and -not($Username)){
-        $global:SN_Cert = Get-AuthCertificate
-        $SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/my.policy" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body "choice=1" -WebSession $ServiceNow_Session
-    }else{
-        $global:SN_Cert = Get-AuthCertificate
-        $SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/login.do" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -WebSession $ServiceNow_Session
+    try{
+        if($Username -and $Pass){
+            $SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/login.do" -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body @{
+                "sysparm_ck" = $SN_GCK_Token
+                "user_name" = $Username
+                "user_password" = $Pass
+                "not_important"=$null
+                "ni.nolog.user_password" = $true
+                "ni.noecho.user_name" = $true
+                "ni.noecho.user_password" = $true
+                "sys_action" = "sysverb_login"
+                "sysparm_login_url" = "welcome.do"} -WebSession $ServiceNow_Session
+        }elseif($DoD -and -not($Username)){
+            $global:SN_Cert = Get-AuthCertificate
+            $SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/my.policy" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body "choice=1" -WebSession $ServiceNow_Session
+        }else{
+            $global:SN_Cert = Get-AuthCertificate
+            $SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/login.do" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -WebSession $ServiceNow_Session
+        }
+        if($SN_Banner_Page.StatusCode -ne 200){
+            Write-Host "Authentication to ServiceNow failed!`nStatus Code: $($SN_Banner_Page.StatusCode)"
+            return
+        }
+    }catch{
+        Write-Host "Authentication to ServiceNow failed!`nError: $($_.Exception.Message)" -ForegroundColor Red
     }
     
     #Retrieve and Set Current User Settings
     if ($SN_Banner_Page.Content -match "window.NOW.user.userID = '(.*?)'") {$global:SN_UserID = $matches[1];write-host "Found User ID: $SN_UserID" -ForegroundColor Green}
     if ($SN_Banner_Page.Content -match "var g_ck = '(.*)'") {$global:SN_User_Token = $matches[1];write-host "Found User Token: $SN_User_Token" -ForegroundColor Green}
 
-    $global:SN_User_Profile_Page = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session).records
+    $global:SN_User_Profile_Page = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session -Headers @{"X-UserToken"=$SN_User_Token} -ErrorAction Stop).records
 
     $global:SN_DisplayName = $SN_User_Profile_Page.name
     $global:SN_UserName = $SN_User_Profile_Page.user_name
     $global:SN_LocationID = $SN_User_Profile_Page.location
     #$global:SN_Location_Name = ((Invoke-WebRequest -Uri "https://$ServiceNow_Server/cmn_location.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_LocationID" -WebSession $ServiceNow_Session).Content | ConvertFrom-JSON).records.name
-    $global:SN_Location_Name = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" -Method "POST" -WebSession $ServiceNow_Session -Headers @{"X-UserToken"=$SN_User_Token} -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=AjaxClientHelper&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=getDisplay&sysparm_table=cmn_location&sysparm_value=$SN_LocationID&sysparm_synch=true&ni.nolog.x_referer=ignore").xml.answer
+    $global:SN_Location_Name = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" -Method "POST" -WebSession $ServiceNow_Session -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=AjaxClientHelper&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=getDisplay&sysparm_table=cmn_location&sysparm_value=$SN_LocationID&sysparm_synch=true&ni.nolog.x_referer=ignore").xml.answer
 
-    Write-Host "Display Name: $SN_DisplayName`nUsername: $SN_UserName`nLocation: $SN_Location_Name" -ForegroundColor Green
+    Write-Host "Display Name: $SN_DisplayName`nUsername: $SN_UserName`nLocation: $SN_Location_Name`n" -ForegroundColor Green
 
-    if($SN_Banner_Page.StatusCode -eq 200){
-        Write-Host "Connected to Service Now!`n" -ForegroundColor Green
-        $ServiceNow_Session_Expires = ($ServiceNow_Session.Cookies.GetCookies("https://$ServiceNow_Server") | where {$_.Name -eq "glide_session_store"}).Expires
-        $global:ServiceNow_Session_Expires_Minutes = [math]::Floor((New-TimeSpan -Start (Get-Date) -End $ServiceNow_Session_Expires).TotalMinutes)
-        write-host "Session Expiry: $ServiceNow_Session_Expires_Minutes minutes"
-        New-SNSessionRefresher
-    }else{
-        Write-Host "Authentication to Service Now failed!" -ForegroundColor Red
-        $global:ServiceNow_Session = $null
-    }
+    Write-Host "Connected to Service Now!`n" -ForegroundColor Green
+    $ServiceNow_Session_Expires = ($ServiceNow_Session.Cookies.GetCookies("https://$ServiceNow_Server") | where {$_.Name -eq "glide_session_store"}).Expires
+    $global:ServiceNow_Session_Expires_Minutes = [math]::Floor((New-TimeSpan -Start (Get-Date) -End $ServiceNow_Session_Expires).TotalMinutes)
+    write-host "Session Expiry: $ServiceNow_Session_Expires_Minutes minutes"
+    New-SNSessionRefresher
 }
 
 function New-SNSessionRefresher{
