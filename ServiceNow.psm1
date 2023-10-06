@@ -799,7 +799,7 @@ param(
     if($SN_Banner_Page.StatusCode -eq 200){
         Write-Host "Connected to Service Now!`n" -ForegroundColor Green
         $ServiceNow_Session_Expires = ($ServiceNow_Session.Cookies.GetCookies("https://$ServiceNow_Server") | where {$_.Name -eq "glide_session_store"}).Expires
-        $global:ServiceNow_Session_Expires_Minutes = New-TimeSpan -Start (Get-Date) -End $ServiceNow_Session_Expires
+        $global:ServiceNow_Session_Expires_Minutes = [math]::Floor((New-TimeSpan -Start (Get-Date) -End $ServiceNow_Session_Expires).TotalMinutes)
         write-host "Session Expiry: $ServiceNow_Session_Expires_Minutes minutes"
         New-SNSessionRefresher
     }else{
@@ -813,7 +813,7 @@ function New-SNSessionRefresher{
 
     $Action = {
         $ServiceNow_Session_Expires = ($ServiceNow_Session.Cookies.GetCookies("https://$ServiceNow_Server") | where {$_.Name -eq "glide_session_store"}).Expires
-        $global:ServiceNow_Session_Expires_Minutes = (New-TimeSpan -Start (Get-Date) -End $ServiceNow_Session_Expires).Minutes
+        $global:ServiceNow_Session_Expires_Minutes = [math]::Floor((New-TimeSpan -Start (Get-Date) -End $ServiceNow_Session_Expires).TotalMinutes)
 
         $SN_User_Profile_Page_Refresh = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session).records
         $SN_DisplayName_Refresh = $SN_User_Profile_Page_Refresh.name
