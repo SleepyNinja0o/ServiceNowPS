@@ -409,7 +409,7 @@ $TicketSearch
 }
 
 function Get-ServiceNowServices {
-    $global:ServiceNowServicesFilePath = "$($PSScriptRoot)\ServiceNow_Services.JSON"
+    $global:ServiceNowServicesFilePath = "$($PSScriptRoot)\ServiceNow_Services.json"
 
     if(Test-Path $ServiceNowServicesFilePath){
         $global:ServiceNow_Services = (Get-Content $ServiceNowServicesFilePath -Raw) | ConvertFrom-Json
@@ -901,7 +901,7 @@ function Update-ServiceNowGroups {
 function Update-ServiceNowServices {
     Confirm-ServiceNowSession
 
-    $global:ServiceNowServicesFilePath = "$($PSScriptRoot)\ServiceNow_Groups.json"
+    $global:ServiceNowServicesFilePath = "$($PSScriptRoot)\ServiceNow_Services.json"
     $ServiceNow_Services = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/cmdb_ci_service_list.do?JSONv2&sysparm_target=incident.business_service" -WebSession $ServiceNow_Session -Headers @{"X-UserToken"=$SN_User_Token}).records | where {$_.name -ne "" -and $_.name -ne $null} | select name,sys_id | sort name | ConvertTo-Json | Out-File $ServiceNowServicesFilePath -Force
     Write-Host "Service Now Services JSON file updated successfully!" -ForegroundColor Green
 }
