@@ -842,16 +842,14 @@ function New-SNSessionRefresher{
     $ServiceNow_Session_Timer.Enabled = $True
 }
 
-function Search-Customer{
+function Search-ServiceNowCustomer{
 param($Name)
-    $wr = Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" `
+    $Customers = Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" `
     -Method "POST" `
     -WebSession $ServiceNow_Session `
-    -Headers @{
-      "X-UserToken"=$SN_User_Token
-    } `
     -ContentType "application/x-www-form-urlencoded; charset=UTF-8" `
     -Body "sysparm_processor=Reference&sysparm_scope=global&sysparm_want_session_messages=true&ni.nolog.x_referer=ignore&sysparm_name=incident.caller_id&sysparm_max=15&sysparm_chars=$Name&sysparm_value=&ac_columns=user_name;u_district;email&ac_order_by=name"
+    return $Customers.xml.ChildNodes
 }
 
 function Update-ServiceNowCategories {
@@ -919,6 +917,7 @@ Export-ModuleMember -Function Get-ServiceNowServices
 Export-ModuleMember -Function New-ServiceNowIncident
 Export-ModuleMember -Function New-ServiceNowSCTask
 Export-ModuleMember -Function New-ServiceNowSession
+Export-ModuleMember -Function Search-ServiceNowCustomer
 Export-ModuleMember -Function Update-ServiceNowCategories
 Export-ModuleMember -Function Update-ServiceNowGroups
 Export-ModuleMember -Function Update-ServiceNowServices
