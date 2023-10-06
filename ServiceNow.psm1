@@ -741,7 +741,8 @@ $File="",
 function New-ServiceNowSession{
 param(
     $Username,
-    $Pass
+    $Pass,
+    [switch]$DoD
 )
     Close-ServiceNowSession
 
@@ -750,7 +751,7 @@ param(
     if ($SN_Login_Page.Content -match "var g_ck = '(.*)'") {$SN_GCK_Token = $matches[1];write-host "Found G_CK Token: $SN_GCK_Token" -ForegroundColor Green}
     
     if($Username -and $Pass){
-        $global:SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/login.do" -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body @{
+        $SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/login.do" -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body @{
             "sysparm_ck" = $SN_GCK_Token
             "user_name" = $Username
             "user_password" = $Pass
@@ -760,9 +761,12 @@ param(
             "ni.noecho.user_password" = $true
             "sys_action" = "sysverb_login"
             "sysparm_login_url" = "welcome.do"} -WebSession $ServiceNow_Session
+    }elseif($DoD -and -not($Username)){
+        $global:SN_Cert = Get-AuthCertificate
+        $SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/my.policy" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body "choice=1" -WebSession $ServiceNow_Session
     }else{
         $global:SN_Cert = Get-AuthCertificate
-        $global:SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/login.do" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body "choice=1" -WebSession $ServiceNow_Session
+        $SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/login.do" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -WebSession $ServiceNow_Session
     }
     
     #Retrieve and Set Current User Settings
