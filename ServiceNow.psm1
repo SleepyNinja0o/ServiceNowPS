@@ -739,16 +739,35 @@ $File="",
 }
 
 function New-ServiceNowSession{
+param(
+    $Username,
+    $Pass
+)
     Close-ServiceNowSession
 
-    $global:SN_Cert = Get-AuthCertificate
     Write-Host "Connecting to Service Now..." -ForegroundColor Yellow
-    Invoke-WebRequest -Uri "https://$ServiceNow_Server/" -SessionVariable global:ServiceNow_Session | Out-Null
-    $global:SN_DoD_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/my.policy" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body "choice=1" -WebSession $ServiceNow_Session
+    $SN_Login_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/" -SessionVariable global:ServiceNow_Session
+    if ($SN_Login_Page.Content -match "var g_ck = '(.*)'") {$SN_GCK_Token = $matches[1];write-host "Found G_CK Token: $SN_GCK_Token" -ForegroundColor Green}
+    
+    if($Username -and $Pass){
+        $global:SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/login.do" -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body @{
+            "sysparm_ck" = $SN_GCK_Token
+            "user_name" = $Username
+            "user_password" = $Pass
+            "not_important"=$null
+            "ni.nolog.user_password" = $true
+            "ni.noecho.user_name" = $true
+            "ni.noecho.user_password" = $true
+            "sys_action" = "sysverb_login"
+            "sysparm_login_url" = "welcome.do"} -WebSession $ServiceNow_Session
+    }else{
+        $global:SN_Cert = Get-AuthCertificate
+        $global:SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/login.do" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body "choice=1" -WebSession $ServiceNow_Session
+    }
     
     #Retrieve and Set Current User Settings
-    if ($SN_DoD_Banner_Page.Content -match "window.NOW.user.userID = '(.*?)'") {$global:SN_UserID = $matches[1];write-host "Found User ID: $SN_UserID" -ForegroundColor Green}
-    if ($SN_DoD_Banner_Page.Content -match "var g_ck = '(.*)'") {$global:SN_User_Token = $matches[1];write-host "Found User Token: $SN_User_Token" -ForegroundColor Green}
+    if ($SN_Banner_Page.Content -match "window.NOW.user.userID = '(.*?)'") {$global:SN_UserID = $matches[1];write-host "Found User ID: $SN_UserID" -ForegroundColor Green}
+    if ($SN_Banner_Page.Content -match "var g_ck = '(.*)'") {$global:SN_User_Token = $matches[1];write-host "Found User Token: $SN_User_Token" -ForegroundColor Green}
 
     $global:SN_User_Profile_Page = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session).records
 
@@ -759,7 +778,7 @@ function New-ServiceNowSession{
     #$global:SN_Location_Name = ((Invoke-WebRequest -Uri "https://$ServiceNow_Server/cmn_location.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_LocationID" -WebSession $ServiceNow_Session).Content | ConvertFrom-JSON).records.name
     $global:SN_Location_Name = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" -Method "POST" -WebSession $ServiceNow_Session -Headers @{"X-UserToken"=$SN_User_Token} -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=AjaxClientHelper&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=getDisplay&sysparm_table=cmn_location&sysparm_value=$SN_LocationID&sysparm_synch=true&ni.nolog.x_referer=ignore").xml.answer
 
-    if($SN_DoD_Banner_Page.StatusCode -eq 200){
+    if($SN_Banner_Page.StatusCode -eq 200){
         Write-Host "Connected to Service Now!`n" -ForegroundColor Green
         $global:ServiceNow_Session_Expires = ($ServiceNow_Session.Cookies.GetCookies("https://$ServiceNow_Server") | where {$_.Name -eq "glide_session_store"}).Expires
         $global:ServiceNow_Session_Expires_Minutes = New-TimeSpan -Start (Get-Date) -End $ServiceNow_Session_Expires
