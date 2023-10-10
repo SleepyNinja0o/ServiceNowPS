@@ -1,3 +1,3 @@
 # ServiceNowPS
 PowerShell module for ServiceNow based on the JSONv2 web service.</br>
-Does not require API access. Only requires "ITIL" user role.
+The JSONv2 web service does not require API access, it only requires the "ITIL" user role.
