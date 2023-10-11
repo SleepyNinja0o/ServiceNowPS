@@ -844,12 +844,11 @@ function New-SNSessionRefresher{
 
 function Search-ServiceNowCustomer{
 param($Name)
-    $Customers = Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" `
+    return (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" `
     -Method "POST" `
     -WebSession $ServiceNow_Session `
     -ContentType "application/x-www-form-urlencoded; charset=UTF-8" `
-    -Body "sysparm_processor=Reference&sysparm_scope=global&sysparm_want_session_messages=true&ni.nolog.x_referer=ignore&sysparm_name=incident.caller_id&sysparm_max=15&sysparm_chars=$Name&sysparm_value=&ac_columns=user_name;u_district;email&ac_order_by=name"
-    return $Customers.xml.ChildNodes
+    -Body "sysparm_processor=Reference&sysparm_scope=global&sysparm_want_session_messages=true&ni.nolog.x_referer=ignore&sysparm_name=incident.caller_id&sysparm_max=15&sysparm_chars=$Name&sysparm_value=&ac_columns=user_name;u_district;email&ac_order_by=name").xml.ChildNodes
 }
 
 function Update-ServiceNowCategories {
