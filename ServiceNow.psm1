@@ -23,10 +23,9 @@ param(
 [Parameter(Mandatory)]
 [ValidateSet("sc_task","incident")]
 $TicketType,
-[Parameter(Mandatory)]
+$TicketNumber,
 $TicketSysID,
-$File,
-[switch]$SkipVerification
+$File
 )
     if (!$ServiceNow_Session){Confirm-ServiceNowSession}
 
@@ -39,6 +38,17 @@ $File,
             }
         }else{
             $SN_Attachment_File = Get-File
+        }
+
+        if($TicketNumber){
+            switch($TicketType){
+                "sc_task" {
+                    $TicketSysID = (Get-ServiceNowRecord -RecordType ScheduledTask -TicketNumber $TicketNumber).sys_id
+                }
+                "incident" {
+                    $TicketSysID = (Get-ServiceNowRecord -RecordType Incident -TicketNumber $TicketNumber).sys_id
+                }
+            }
         }
         $SN_Attachment_FileName = $SN_Attachment_File.SafeFileName
         $SN_Attachment_Table_Name = $TicketType
