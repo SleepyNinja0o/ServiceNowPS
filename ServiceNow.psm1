@@ -61,89 +61,98 @@ $File
 )
     if (!$ServiceNow_Session){Confirm-ServiceNowSession}
 
-        #Upload Attachment to Ticket in ServiceNow
-        if($File -and $File -ne ""){
-            $FileOb = Get-Item $File
-            $SN_Attachment_File = @{
-                'SafeFileName' = $FileOb.FullName.substring($FileOb.FullName.LastIndexOf("\")+1)
-                'FileName' = $FileOb.FullName
+    if($TicketNumber){
+        switch($TicketType){
+            "sc_task" {
+                $TicketSysID = (Get-ServiceNowRecord -RecordType ScheduledTask -TicketNumber $TicketNumber).sys_id
             }
-        }else{
-            $SN_Attachment_File = Get-File
-        }
-
-        if($TicketNumber){
-            switch($TicketType){
-                "sc_task" {
-                    $TicketSysID = (Get-ServiceNowRecord -RecordType ScheduledTask -TicketNumber $TicketNumber).sys_id
-                }
-                "incident" {
-                    $TicketSysID = (Get-ServiceNowRecord -RecordType Incident -TicketNumber $TicketNumber).sys_id
-                }
+            "incident" {
+                $TicketSysID = (Get-ServiceNowRecord -RecordType Incident -TicketNumber $TicketNumber).sys_id
             }
         }
-        $SN_Attachment_FileName = $SN_Attachment_File.SafeFileName
-        $SN_Attachment_Table_Name = $TicketType
-        $SN_Attachment_Table_Sys_Id = $TicketSysID
-        $SN_Attachment_Content_Type = Get-MimeType $SN_Attachment_File.FileName
-        $SN_Attachment_Payload_File = $SN_Attachment_File.FileName
-        $SN_Attachment_Payload_File_Bin = [IO.File]::ReadAllBytes($SN_Attachment_Payload_File)
-        $SN_Attachment_Encoding = [System.Text.Encoding]::GetEncoding("iso-8859-1")
-        $SN_Attachment_Payload_File_Encoding = $SN_Attachment_Encoding.GetString($SN_Attachment_Payload_File_Bin)
-        $SN_Attachment_GUID = ((New-Guid).Guid | Out-String).Trim()
-        $LF = "`r`n"
-        $SN_Attachment_Body = (
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"sysparm_ck`"",
-            "",
-            $SN_User_Token,
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"attachments_modified`"",
-            "",
-            "",
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"sysparm_sys_id`"",
-            "",
-            $SN_Attachment_Table_Sys_Id,
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"sysparm_table`"",
-            "",
-            $SN_Attachment_Table_Name,
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"max_size`"",
-            "",
-            "1024",
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"file_types`"",
-            "",
-            "",
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"sysparm_nostack`"",
-            "",
-            "yes",
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"sysparm_redirect`"",
-            "",
-            "attachment_uploaded.do?sysparm_domain_restore=false&sysparm_nostack=yes",
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"sysparm_encryption_context`"",
-            "",
-            "",
-            "-----------------------------$SN_Attachment_GUID",
-            "Content-Disposition: form-data; name=`"attachFile`"; filename=`"$SN_Attachment_FileName`"",
-            "Content-Type: $SN_Attachment_Content_Type",
-            "",
-            $SN_Attachment_Payload_File_Encoding,
-            "-----------------------------$SN_Attachment_GUID--",
-            ""
-        ) -join $LF
+    }
 
-    $global:SN_Submit_Attachment = Invoke-WebRequest -Uri "https://$ServiceNow_Server/sys_attachment.do?sysparm_record_scope=global" -Method "POST" -ContentType "multipart/form-data; boundary=---------------------------$SN_Attachment_GUID" -Body $SN_Attachment_Body -WebSession $ServiceNow_Session
-    if ($SN_Submit_Attachment.StatusCode -eq "200") {
-        #$INC_ID = $Submit_INC_2.number
-        Write-Host "*** Successfully Submitted Attachment `"$SN_Attachment_FileName`" for Ticket $TicketSysID ***" -ForegroundColor Green
+    if(-not $TicketSysID){
+        Write-Host "Ticket SysID or Number is required for this function!" -ForegroundColor Red
+        return
+    }
+
+    #Upload Attachment to Ticket in ServiceNow
+    if($File -and $File -ne ""){
+        $FileOb = Get-Item $File
+        $SN_Attachment_File = @{
+            'SafeFileName' = $FileOb.FullName.substring($FileOb.FullName.LastIndexOf("\")+1)
+            'FileName' = $FileOb.FullName
+        }
     }else{
-        Write-Host "File attachment upload failed!`nStatus: $($SN_Submit_Attachment.StatusCode)`n"
+        $SN_Attachment_File = Get-File
+    }
+
+    $SN_Attachment_FileName = $SN_Attachment_File.SafeFileName
+    $SN_Attachment_Table_Name = $TicketType
+    $SN_Attachment_Table_Sys_Id = $TicketSysID
+    $SN_Attachment_Content_Type = Get-MimeType $SN_Attachment_File.FileName
+    $SN_Attachment_Payload_File = $SN_Attachment_File.FileName
+    $SN_Attachment_Payload_File_Bin = [IO.File]::ReadAllBytes($SN_Attachment_Payload_File)
+    $SN_Attachment_Encoding = [System.Text.Encoding]::GetEncoding("iso-8859-1")
+    $SN_Attachment_Payload_File_Encoding = $SN_Attachment_Encoding.GetString($SN_Attachment_Payload_File_Bin)
+    $SN_Attachment_GUID = ((New-Guid).Guid | Out-String).Trim()
+    $LF = "`r`n"
+    $SN_Attachment_Body = (
+        "-----------------------------$SN_Attachment_GUID",
+        "Content-Disposition: form-data; name=`"sysparm_ck`"",
+        "",
+        $SN_User_Token,
+        "-----------------------------$SN_Attachment_GUID",
+        "Content-Disposition: form-data; name=`"attachments_modified`"",
+        "",
+        "",
+        "-----------------------------$SN_Attachment_GUID",
+        "Content-Disposition: form-data; name=`"sysparm_sys_id`"",
+        "",
+        $SN_Attachment_Table_Sys_Id,
+        "-----------------------------$SN_Attachment_GUID",
+        "Content-Disposition: form-data; name=`"sysparm_table`"",
+        "",
+        $SN_Attachment_Table_Name,
+        "-----------------------------$SN_Attachment_GUID",
+        "Content-Disposition: form-data; name=`"max_size`"",
+        "",
+        "1024",
+        "-----------------------------$SN_Attachment_GUID",
+        "Content-Disposition: form-data; name=`"file_types`"",
+        "",
+        "",
+        "-----------------------------$SN_Attachment_GUID",
+        "Content-Disposition: form-data; name=`"sysparm_nostack`"",
+        "",
+        "yes",
+        "-----------------------------$SN_Attachment_GUID",
+        "Content-Disposition: form-data; name=`"sysparm_redirect`"",
+        "",
+        "attachment_uploaded.do?sysparm_domain_restore=false&sysparm_nostack=yes",
+        "-----------------------------$SN_Attachment_GUID",
+        "Content-Disposition: form-data; name=`"sysparm_encryption_context`"",
+        "",
+        "",
+        "-----------------------------$SN_Attachment_GUID",
+        "Content-Disposition: form-data; name=`"attachFile`"; filename=`"$SN_Attachment_FileName`"",
+        "Content-Type: $SN_Attachment_Content_Type",
+        "",
+        $SN_Attachment_Payload_File_Encoding,
+        "-----------------------------$SN_Attachment_GUID--",
+        ""
+    ) -join $LF
+
+    try{
+        $global:SN_Submit_Attachment = Invoke-WebRequest -Uri "https://$ServiceNow_Server/sys_attachment.do?sysparm_record_scope=global" -Method "POST" -ContentType "multipart/form-data; boundary=---------------------------$SN_Attachment_GUID" -Body $SN_Attachment_Body -WebSession $ServiceNow_Session
+        if ($SN_Submit_Attachment.StatusCode -eq "200") {
+            Write-Host "*** Successfully Submitted Attachment `"$SN_Attachment_FileName`" for Ticket $TicketNumber ***" -ForegroundColor Green
+        }else{
+            Write-Host "File attachment upload failed!`nStatus: $($SN_Submit_Attachment.StatusCode)`n"
+        }
+    }catch{
+        Write-Host "File attachment upload failed!`nError: $($_.Exception.Message)`n"
     }
 }
 
