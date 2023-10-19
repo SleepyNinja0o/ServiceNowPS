@@ -19,6 +19,38 @@ Closed Skipped    7
 $Global:ServiceNow_Server = "https://*****.service-now.com"
 
 function Add-ServiceNowAttachment{
+<#
+.SYNOPSIS
+Uploads an attachment to a ServiceNow ticket of the specified type.
+
+.DESCRIPTION
+This function allows you to add an attachment to a specified ServiceNow ticket, such as an incident or service task (sc_task).
+
+.PARAMETER TicketType
+Specifies the type of the ServiceNow ticket. Use "incident" for incidents and "sc_task" for service tasks.
+
+.PARAMETER TicketNumber
+Specifies the unique ticket number (INC******* or SCTASK*******) of the ServiceNow ticket to which you want to attach a file.
+
+.PARAMETER TicketSysID
+Specifies the unique system ID (SysID) of the ServiceNow ticket to which you want to attach a file.
+
+.PARAMETER File
+Specifies the path to the file that you want to attach to the ServiceNow ticket.
+
+.EXAMPLE
+# Example 1: Upload an attachment to an incident
+Add-ServiceNowAttachment -TicketType "incident" -TicketNumber "INC0123456" -File "C:\Documents\attachment.pdf"
+
+This example uploads the "attachment.pdf" file to the incident with Ticket Number "INC0123456" in ServiceNow.
+
+.EXAMPLE
+# Example 2: Upload an attachment to a service task using the SysID
+Add-ServiceNowAttachment -TicketType "sc_task" -TicketSysID "57af7aec73d423002728660c4cf6a71c" -File "D:\Files\document.docx"
+
+This example uploads the "document.docx" file to the service task with Sys ID "57af7aec73d423002728660c4cf6a71c" in ServiceNow.
+
+#>
 param(
 [Parameter(Mandatory)]
 [ValidateSet("sc_task","incident")]
