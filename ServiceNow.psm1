@@ -39,7 +39,7 @@ Specifies the unique system ID (SysID) of the ServiceNow ticket to which you wan
 Specifies the path to the file that you want to attach to the ServiceNow ticket.
 
 .EXAMPLE
-# Example 1: Upload an attachment to an incident
+# Example 1: Upload an attachment to an incident using TicketNumber
 Add-ServiceNowAttachment -TicketType "incident" -TicketNumber "INC0123456" -File "C:\Documents\attachment.pdf"
 
 This example uploads the "attachment.pdf" file to the incident with Ticket Number "INC0123456" in ServiceNow.
