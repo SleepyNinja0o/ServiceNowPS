@@ -211,7 +211,7 @@ function Confirm-ServiceNowSession{
 }
 
 function Get-AuthCertificate {
-    $Certificates = [System.Security.Cryptography.X509Certificates.X509Certificate2[]](Get-ChildItem Cert:\CurrentUser\My | where {$_.NotAfter -gt (Get-Date) -and $_.EnhancedKeyUsageList.FriendlyName -match "Smart Card Logon|Client Authentication"}) | select Thumbprint,FriendlyName,@{l="Issuer";e={$_.Issuer.Split(",")[0]}}
+    $Certificates = [System.Security.Cryptography.X509Certificates.X509Certificate2[]](Get-ChildItem Cert:\CurrentUser\My | where {$_.NotAfter -gt (Get-Date) -and $_.EnhancedKeyUsageList.FriendlyName -match "Smart Card Logon|Client Authentication"})
     
     $Certificates | Add-Member -MemberType NoteProperty -Name "Index" -Value 0
     $i=0
