@@ -212,13 +212,13 @@ function Confirm-ServiceNowSession{
 
 function Get-AuthCertificate {
     $Certificates = [System.Security.Cryptography.X509Certificates.X509Certificate2[]](Get-ChildItem Cert:\CurrentUser\My | where {$_.NotAfter -gt (Get-Date) -and $_.EnhancedKeyUsageList.FriendlyName -match "Smart Card Logon|Client Authentication"})
-    
-    $Certificates | Add-Member -MemberType NoteProperty -Name "Index" -Value 0
+    $Certificates2 = $Certificates.psobject.Copy()
+
+    $Certificates2 | Add-Member -MemberType NoteProperty -Name "Index" -Value 0
     $i=0
-    foreach($Cert in $Certificates){$Cert.Index=$i;$i++}
-    $Certificates = $Certificates | select Index,FriendlyName,Thumbprint,Issuer
+    foreach($Cert in $Certificates2){$Cert.Index=$i;$i++}
     Write-Host "******Smart Card Certificates******`n" -ForegroundColor Yellow
-    write-host "$(($Certificates | Out-String).Trim())"
+    write-host $(($Certificates2 | select Index,Thumbprint,FriendlyName,@{l="Issuer";e={$_.Issuer.Split(",")[0]}} |  Out-String).Trim())
 
     Write-Host "`nCertificate #: " -NoNewline -ForegroundColor Yellow
     $i = Read-Host
