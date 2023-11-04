@@ -18,6 +18,19 @@ Closed Skipped    7
 
 $Global:ServiceNow_Server = "https://*****.service-now.com"
 
+function Parse-String ($String,$StartStr,$EndStr){
+    if($String.IndexOf($StartStr) -eq -1){return ""}
+    $StartStrPos = $String.IndexOf($StartStr)+$StartStr.Length
+
+    if($String.IndexOf($EndStr,$StartStrPos) -eq -1){return ""}
+    $EndStrPos = $String.IndexOf($EndStr,$StartStrPos)
+
+    $ParsedStr = $String.Substring($StartStrPos,$EndStrPos-$StartStrPos)
+    if($ParsedStr -ne "" -and $ParsedStr -ne $null){return $ParsedStr}
+
+    return ""
+}
+
 function Add-ServiceNowAttachment{
 <#
 .SYNOPSIS
@@ -794,8 +807,7 @@ param(
     $Server,
     $Username,
     $Pass,
-    [switch]$CertificateAuth,
-    [switch]$DoD
+    [switch]$CertificateAuth
 )
     if($Global:ServiceNow_Server -match "\*" -and !$Server){
         Write-Host "No server was provided for ServiceNow connection!" -ForegroundColor Red
@@ -833,26 +845,94 @@ param(
                 "ni.noecho.user_password" = $true
                 "sys_action" = "sysverb_login"
                 "sysparm_login_url" = "welcome.do"} -WebSession $ServiceNow_Session
-        }elseif($DoD -and -not($Username)){
-            $global:SN_Cert = Get-AuthCertificate
-            $SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/my.policy" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body "choice=1" -WebSession $ServiceNow_Session
-        }else{
+        }elseif($CertificateAuth.IsPresent){
             $global:SN_Cert = Get-AuthCertificate
             $SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/login.do" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -WebSession $ServiceNow_Session
+        }elseif($Server -match "aesmp\.army\.mil"){          
+            #Create AESMP web session
+            $AESMP_MainPage = Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server" -SessionVariable ServiceNow_Session -Verbose
+            $Portal_ID = Parse-String -String $AESMP_MainPage -StartStr "ng-init=`"portal_id = '" -EndStr "'"
+            $UnixEpochTime = ((Get-Date -UFormat %s) -replace "\.","").Substring(0,13)
+
+            #Retrieve Glide SSO ID from AESMP
+            Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/csm?id=landing" -WebSession $ServiceNow_Session | Out-Null
+            $AESMP_LandingPage = (Invoke-WebRequest -UseBasicParsing -Uri "https://$ServiceNow_Server/api/now/sp/page?id=landing&time=$UnixEpochTime&portal_id=$Portal_ID&request_uri=%2Fcsm%3Fid%3Dlanding" -WebSession $ServiceNow_Session).Content
+            $Glide_SSO_ID = Parse-String -String $AESMP_LandingPage -StartStr '"href":"/login_with_sso.do?glide_sso_id=' -EndStr "`""
+
+            #Retrieve HTTP Redirect for EAMS Authentication
+            $AESMP_Login_SSO = Invoke-WebRequest -UseBasicParsing -Uri "https://$ServiceNow_Server/login_with_sso.do?glide_sso_id=$Glide_SSO_ID" -WebSession $ServiceNow_Session
+            $EAMS_Redirect_URL = $AESMP_Login_SSO.BaseResponse.ResponseUri.AbsoluteUri
+            $EAMS_Redirect = Invoke-RestMethod -UseBasicParsing -Uri $EAMS_Redirect_URL -WebSession $ServiceNow_Session
+            $EAMS_URL = Parse-String -String $EAMS_Redirect -StartStr "top.location.href = '" -EndStr "'"
+
+            #Retrieve required tokens from EAMS Main Page
+            $EAMS_MainPage = Invoke-RestMethod -UseBasicParsing -Uri $EAMS_URL -WebSession $ServiceNow_Session
+
+            #Create hashtable to convert login data to correct key values for EAMS login POST request
+            $EAMS_Auth_Request_Elements_Map = [ordered]@{
+                "authenticity_token" = "authenticity_token"
+                "sso_session_orig_url" = "sso_session[orig_url]"
+                "sso_session_orig_method" = "sso_session[orig_method]"
+                "sso_session_renewed_session" = "sso_session[renewed_session]"
+                "sso_session_pki_upgrade" = "sso_session[pki_upgrade]"
+                "SAMLRequest" = "SAMLRequest"
+                "RelayState" = "RelayState"
+            }
+            $EAMS_Auth_Request_Elements = ($EAMS_Auth_Request_Elements_Map.keys | Out-String -Stream)[1..$EAMS_Auth_Request_Elements_Map.Count]
+
+            #Create POST request body required for EAMS login
+            $EAMS_Auth_Request = [ordered]@{}
+            $EAMS_Auth_Request.Add("authenticity_token",(Parse-String $EAMS_MainPage -StartStr 'name="authenticity_token" value="' -EndStr '"'))
+            foreach($Element in $EAMS_Auth_Request_Elements){
+                $EAMS_Auth_Request.Add($EAMS_Auth_Request_Elements_Map[$Element],(Parse-String $EAMS_MainPage -StartStr "id=`"$Element`" value=`"" -EndStr '"'))
+            }
+
+            #Retrieve Smart Card certificate and login to EAMS
+            $global:SN_Cert = Get-AuthCertificate
+            $EAMS_Login = Invoke-WebRequest -Uri "https://federation.eams.army.mil/pool/sso/saml/authenticate?request_client_cert=true" -WebSession $ServiceNow_Session -Certificate $SN_Cert -Method Post -ContentType "application/x-www-form-urlencoded" -Body $EAMS_Auth_Request -Verbose
+            $EAMS_Login_Redirect_URL = $EAMS_Login.BaseResponse.ResponseUri.AbsoluteUri
+
+            #Return EAMS login status message
+            if($EAMS_Login.Content -match "Your account has been successfully authenticated"){
+                Write-Host "`nEAMS authentication successful!" -ForegroundColor Green
+            }else{
+                Write-Host "`nEAMS authentication failed!" -ForegroundColor Red
+            }
+
+            #Retrieve login tokens from EAMS website to forward to AESMP
+            $EAMS_Login_Redirect = Invoke-RestMethod -UseBasicParsing -Uri $EAMS_Login_Redirect_URL -WebSession $ServiceNow_Session
+            $AESMP_Auth_Request = @{
+                "authenticity_token" = (Parse-String $EAMS_Login_Redirect -StartStr 'name="authenticity_token" value="' -EndStr '"')
+                "SAMLResponse" = (Parse-String $EAMS_Login_Redirect -StartStr "id=`"SAMLResponse`" value=`"" -EndStr '"')
+                "RelayState" = (Parse-String $EAMS_Login_Redirect -StartStr "id=`"RelayState`" value=`"" -EndStr '"')
+            }
+
+            #Login to AESMP using previous SAML login tokens pulled from EAMS
+            $AESMP_Login = Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/navpage.do" -WebSession $ServiceNow_Session -Method Post -ContentType "application/x-www-form-urlencoded" -Body $AESMP_Auth_Request
+            $SN_Banner_Page = Invoke-WebRequest -UseBasicParsing -Uri "https://$ServiceNow_Server/navpage.do" -WebSession $ServiceNow_Session
         }
+
         if($SN_Banner_Page.StatusCode -ne 200){
             Write-Host "Authentication to ServiceNow failed!`nStatus Code: $($SN_Banner_Page.StatusCode)"
             return
         }
     }catch{
         Write-Host "Authentication to ServiceNow failed!`nError: $($_.Exception.Message)" -ForegroundColor Red
+        return
     }
     
+    if($SN_Banner_Page.Content -match "Session Expired|logged_in = false"){
+        Write-Host "Authentication to ServiceNow failed!`n" -ForegroundColor Red
+        return
+    }else{
+        Write-Host "Authenticated to ServiceNow successfully!`n" -ForegroundColor Green
+    }
+
     #Retrieve and Set Current User Settings
     if ($SN_Banner_Page.Content -match "window.NOW.user.userID = '(.*?)'") {$global:SN_UserID = $matches[1];write-host "Found User ID: $SN_UserID" -ForegroundColor Green}
     if ($SN_Banner_Page.Content -match "window.NOW.user_id = '(.*?)'") {$global:SN_UserID = $matches[1];write-host "Found User ID: $SN_UserID" -ForegroundColor Green}
     if ($SN_Banner_Page.Content -match "`"userID`" : `"(.*?)`",") {$global:SN_UserID = $matches[1];write-host "Found User ID: $SN_UserID" -ForegroundColor Green} #For Admins I believe?
-    if ($SN_Banner_Page.Content -match "g_ck = '(.*)'") {$global:SN_User_Token = $matches[1];write-host "Found User Token: $SN_User_Token" -ForegroundColor Green}
+    if ($SN_Banner_Page.Content -match "g_ck = '(.*)'") {$global:SN_User_Token = $matches[1];write-host "Found User Token: $SN_User_Token`n" -ForegroundColor Green}
 
     $global:SN_User_Profile_Page = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session -Headers @{"X-UserToken"=$SN_User_Token} -ErrorAction Stop).records
 
@@ -862,12 +942,11 @@ param(
     #$global:SN_Location_Name = ((Invoke-WebRequest -Uri "https://$ServiceNow_Server/cmn_location.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_LocationID" -WebSession $ServiceNow_Session).Content | ConvertFrom-JSON).records.name
     $global:SN_Location_Name = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" -Method "POST" -WebSession $ServiceNow_Session -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=AjaxClientHelper&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=getDisplay&sysparm_table=cmn_location&sysparm_value=$SN_LocationID&sysparm_synch=true&ni.nolog.x_referer=ignore").xml.answer
 
-    Write-Host "Display Name: $SN_DisplayName`nUsername: $SN_UserName`nLocation: $SN_Location_Name`n" -ForegroundColor Green
+    Write-Host "Display Name: $SN_DisplayName`nUsername: $SN_UserName`nLocation: $SN_Location_Name" -ForegroundColor Green
 
-    Write-Host "Connected to Service Now!`n" -ForegroundColor Green
     $ServiceNow_Session_Expires = ($ServiceNow_Session.Cookies.GetCookies("https://$ServiceNow_Server") | where {$_.Name -eq "glide_session_store"}).Expires
     $global:ServiceNow_Session_Expires_Minutes = [math]::Floor((New-TimeSpan -Start (Get-Date) -End $ServiceNow_Session_Expires).TotalMinutes)
-    write-host "Session Expiry: $ServiceNow_Session_Expires_Minutes minutes"
+    Write-Host "Session Expiry: $ServiceNow_Session_Expires_Minutes minutes`n`n" -ForegroundColor Yellow
     New-SNSessionRefresher
 }
 
