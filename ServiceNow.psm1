@@ -644,6 +644,105 @@ $File="",
     }
 }
 
+function New-ServiceNowIncidentAdvanced{
+<#
+.SYNOPSIS
+Creates a new Incident in ServiceNow using a custom ticket body.
+
+.DESCRIPTION
+This function allows you to submit an Incident ticket to ServiceNow using a custom ticket body.
+
+.PARAMETER SN_Ticket_Body
+Specifies the details of the ticket body which is submitted directly to ServiceNow.
+
+.PARAMETER File
+Specifies the path to the file that you want to attach to the ServiceNow ticket.
+
+.PARAMETER SkipVerification
+Skips the manual ticket details verification process before ticket is submitted.
+
+.EXAMPLE
+
+# Example 1: Creates a new Incident in ServiceNow using a custom ticket body.
+
+$INC_Body = [ordered]@{
+    caller_id                       = "Tuter, Abel"
+    business_service                = "IT Services"
+    category                        = "Software"
+    subcategory                     = "Email"
+    contact_type                    = "Phone"
+    severity                        = "4 - Low"
+    urgency                         = "4 - Low"
+    assignment_group                = "Change Management"
+    assigned_to                     = "Smith, David"
+    short_description               = "Short Desc Here"
+    description                     = "Long Desc Here`nLine 2`nLine3"
+}
+
+New-ServiceNowIncidentAdvanced -SN_Ticket_Body $INC_Body
+#>
+param(
+[Hashtable]$SN_Ticket_Body,
+[String]$File,
+[switch]$SkipVerification
+)
+    $SN_Ticket_Headers = @{
+        'Accept' = "application/json"
+        'X-UserToken' = $SN_User_Token
+    }
+
+    Write-Host "`n*** Incident Details Overview ***" -ForegroundColor Yellow
+    Write-Host "$(($INC_Body | ft -HideTableHeaders -AutoSize -Wrap | Out-String).Trim())`n" -ForegroundColor Cyan
+
+    if (-not $SkipVerification){
+        $confirm = Read-Host "Continue(y/n): "
+    }else{
+        $confirm = "y"
+    }
+
+    if($confirm.ToLower() -eq "y"){
+        $RetryCount = 0
+        $ReAuthTried = $False
+        while($True){
+            try{
+                $Submit_INC = Invoke-WebRequest -Uri "https://$ServiceNow_Server/incident.do?JSONv2&sysparm_action=insert" -Method "POST" -ContentType "application/json" -Headers $SN_Ticket_Headers -Body $($SN_Ticket_Body | ConvertTo-Json) -WebSession $ServiceNow_Session
+                break
+            }catch{
+                if($ReAuthTried){
+                    Write-Host "Failed to submit ticket after verifying session, skipping!" -ForegroundColor Red
+                    $ReAuthTried = $False
+                    return
+                }
+                Write-Host "Error occured while submitting ticket request to SNOW! Retrying!"
+                if($RetryCount -eq 3){
+                    if(!$ReAuthTried){
+                        Write-Host "Failed to submit ticket 3 times in a row...Verifying Session!" -ForegroundColor Red
+                        Confirm-ServiceNowSession
+                        $ReAuthTried = $True
+                    }
+                }
+                $RetryCount += 1
+            }
+        }
+        $Submit_INC_2 = ($Submit_INC.Content | ConvertFrom-JSON).records[0]
+        if (($Submit_INC.StatusCode -eq "200")) {
+            $Global:INC_Number = $Submit_INC_2.number
+            $Global:INC_SysID = $Submit_INC_2.sys_id
+            Write-Host "*** Successfully Submitted `"$INC_SysID`" to ServiceNow ***`n" -ForegroundColor Green
+            if($File){
+                if($File -ne ""){
+                    Add-ServiceNowAttachment -TicketType 'incident' -TicketSysID $INC_SysID -File $File
+                }else{
+                    Add-ServiceNowAttachment -TicketType 'incident' -TicketSysID $INC_SysID
+                }
+            }
+            return "$INC_Number,$INC_SysID"
+        }
+    }else{
+        Write-Host "Aborting Ticket Creation!`n" -ForegroundColor Red
+    }
+}
+
 function New-ServiceNowSCTask{
 param(
 [Parameter(Mandatory)]
@@ -1047,6 +1146,7 @@ Export-ModuleMember -Function Get-ServiceNowGroups
 Export-ModuleMember -Function Get-ServiceNowRecord
 Export-ModuleMember -Function Get-ServiceNowServices
 Export-ModuleMember -Function New-ServiceNowIncident
+Export-ModuleMember -Function New-ServiceNowIncidentAdvanced
 Export-ModuleMember -Function New-ServiceNowSCTask
 Export-ModuleMember -Function New-ServiceNowSession
 Export-ModuleMember -Function Search-ServiceNowCustomer
