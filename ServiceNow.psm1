@@ -16,6 +16,7 @@ Closed Incomplete 4
 Closed Skipped    7
 #>
 
+Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
 $Global:ServiceNow_Server = "https://*****.service-now.com"
 
 function Parse-String ($String,$StartStr,$EndStr){
@@ -91,7 +92,7 @@ $File
     }
 
     #Upload Attachment to Ticket in ServiceNow
-    if($File -and $File -ne ""){
+    if($File -and (Test-Path $File -PathType Leaf)){
         $FileOb = Get-Item $File
         $SN_Attachment_File = @{
             'SafeFileName' = $FileOb.FullName.substring($FileOb.FullName.LastIndexOf("\")+1)
@@ -240,23 +241,9 @@ function Get-AuthCertificate {
 }
 
 function Get-File {
-param(
-$File=""
-)
-    if ($File -ne ""){
-        $FileOb = Get-Item $File
-        $Directory = $FileOb.Directory.FullName
-        $FileName = $FileOb.FullName.substring($FileOb.FullName.LastIndexOf("\")+1)
-        $FileBrowser = New-Object System.Windows.Forms.OpenFileDialog -Property @{
-            InitialDirectory = $Directory
-            FileName = $FileName
-            Filter = 'All files (*.*)|*.*|Archive|*.7z;*.cab;*.tar;*.gz;*.zip|CSV|*.csv|Excel (*.xls;*.xlsx)|*.xls*|HTML|*.html|Image|*.bmp;*.gif;*.jpg;*.jpeg|JSON|*.json|Outlook|*.msg|PDF|*.pdf|PowerPoint|*.pptx|PS1|*.ps1|TXT|*.rtf;*.txt|Visio|*.vsdx|Word (*.doc;*.docx)|*.doc*|XML|*.xml'
-        }
-    }else{
-        $FileBrowser = New-Object System.Windows.Forms.OpenFileDialog -Property @{
-            InitialDirectory = [Environment]::GetFolderPath('Desktop')
-            Filter = 'All files (*.*)|*.*|Archive|*.7z;*.cab;*.tar;*.gz;*.zip|CSV|*.csv|Excel (*.xls;*.xlsx)|*.xls*|HTML|*.html|Image|*.bmp;*.gif;*.jpg;*.jpeg|JSON|*.json|Outlook|*.msg|PDF|*.pdf|PowerPoint|*.pptx|PS1|*.ps1|TXT|*.rtf;*.txt|Visio|*.vsdx|Word (*.doc;*.docx)|*.doc*|XML|*.xml'
-        }
+    $FileBrowser = New-Object System.Windows.Forms.OpenFileDialog -Property @{
+        InitialDirectory = [Environment]::GetFolderPath('Desktop')
+        Filter = 'All files (*.*)|*.*|Archive|*.7z;*.cab;*.tar;*.gz;*.zip|CSV|*.csv|Excel (*.xls;*.xlsx)|*.xls*|HTML|*.html|Image|*.bmp;*.gif;*.jpg;*.jpeg|JSON|*.json|Outlook|*.msg|PDF|*.pdf|PowerPoint|*.pptx|PS1|*.ps1|TXT|*.rtf;*.txt|Visio|*.vsdx|Word (*.doc;*.docx)|*.doc*|XML|*.xml'
     }
 
     $null = $FileBrowser.ShowDialog()
@@ -511,7 +498,6 @@ $Impact = "3 - Low",
 $Urgency = "3 - Low",
 $Parent,
 $File="",
-[switch]$UploadAttachment,
 #$ConfigurationItem,
 [switch]$SkipVerification
 )
@@ -630,12 +616,8 @@ $File="",
             $Global:INC_Number = $Submit_INC_2.number
             $Global:INC_SysID = $Submit_INC_2.sys_id
             Write-Host "*** Successfully Submitted `"$INC_SysID`" to ServiceNow ***`n" -ForegroundColor Green
-            if($UploadAttachment.IsPresent){
-                if($File -ne "" -and $File -ne $null){
-                    Add-ServiceNowAttachment -TicketType 'incident' -TicketSysID $INC_SysID -File $File
-                }else{
-                    Add-ServiceNowAttachment -TicketType 'incident' -TicketSysID $INC_SysID
-                }
+            if($File -ne ""){
+                Add-ServiceNowAttachment -TicketType 'incident' -TicketSysID $INC_SysID -File $File
             }
             return "$INC_Number,$INC_SysID"
         }
@@ -683,7 +665,7 @@ New-ServiceNowIncidentAdvanced -SN_Ticket_Body $INC_Body
 #>
 param(
 [Hashtable]$SN_Ticket_Body,
-[String]$File,
+[String]$File="",
 [switch]$SkipVerification
 )
     $SN_Ticket_Headers = @{
@@ -695,7 +677,7 @@ param(
     Write-Host "$(($INC_Body | ft -HideTableHeaders -AutoSize -Wrap | Out-String).Trim())`n" -ForegroundColor Cyan
 
     if (-not $SkipVerification){
-        $confirm = Read-Host "Continue(y/n): "
+        $confirm = Read-Host "Continue(y/n)"
     }else{
         $confirm = "y"
     }
@@ -728,13 +710,10 @@ param(
         if (($Submit_INC.StatusCode -eq "200")) {
             $Global:INC_Number = $Submit_INC_2.number
             $Global:INC_SysID = $Submit_INC_2.sys_id
-            Write-Host "*** Successfully Submitted `"$INC_SysID`" to ServiceNow ***`n" -ForegroundColor Green
-            if($File){
-                if($File -ne ""){
-                    Add-ServiceNowAttachment -TicketType 'incident' -TicketSysID $INC_SysID -File $File
-                }else{
-                    Add-ServiceNowAttachment -TicketType 'incident' -TicketSysID $INC_SysID
-                }
+            Write-Host "*** Successfully Submitted `"$INC_Number`" to ServiceNow ***`n" -ForegroundColor Green
+            if($File -ne ""){
+                Write-Host "Uploading file ($File) to $INC_Number..." -ForegroundColor Yellow
+                Add-ServiceNowAttachment -TicketType 'incident' -TicketSysID $INC_SysID -File $File
             }
             return "$INC_Number,$INC_SysID"
         }
@@ -754,7 +733,6 @@ $Group,
 $AssignedTo="",
 $Service="",
 $File="",
-[switch]$UploadAttachment,
 [switch]$SkipVerification
 )
 
@@ -881,12 +859,9 @@ $File="",
                 $global:SCTask_Number = $SCTaskQuery.records[0].number
 
                 Write-Host "*** Successfully Submitted `"$SCTask_Number`" to ServiceNow ***" -ForegroundColor Green
-                if($UploadAttachment.IsPresent){
-                    if($File -ne "" -and $File -ne $null){
-                        Add-ServiceNowAttachment -TicketType 'sc_task' -TicketSysID $SCTask_SysID -File $File
-                    }else{
-                        Add-ServiceNowAttachment -TicketType 'sc_task' -TicketSysID $SCTask_SysID
-                    }
+                if($File -ne ""){
+                    Write-Host "Uploading file ($File) to $SCTask_Number..." -ForegroundColor Yellow
+                    Add-ServiceNowAttachment -TicketType 'sc_task' -TicketSysID $SCTask_SysID -File $File
                 }
 
                 $continue = "true"
