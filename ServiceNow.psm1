@@ -674,7 +674,7 @@ param(
     }
 
     Write-Host "`n*** Incident Details Overview ***" -ForegroundColor Yellow
-    Write-Host "$(($INC_Body | ft -HideTableHeaders -AutoSize -Wrap | Out-String).Trim())`n" -ForegroundColor Cyan
+    Write-Host "$(($SN_Ticket_Body | ft -HideTableHeaders -AutoSize -Wrap | Out-String).Trim())`n" -ForegroundColor Cyan
 
     if (-not $SkipVerification){
         $confirm = Read-Host "Continue(y/n)"
@@ -829,6 +829,81 @@ $File="",
             while($True){
                 try{
                     $Submit_SCTask = Invoke-WebRequest -Uri "https://$ServiceNow_Server/api/sn_sc/v1/servicecatalog/items/5d167fd96ce4fc1004ed764f2fe89f42/order_now" -Method "POST" -ContentType "application/json" -Body $($SN_Ticket_Body | ConvertTo-Json) -WebSession $ServiceNow_Session -Headers $headers -ErrorVariable Submit_SCTask_Error
+                    break
+                }catch{
+                    if($ReAuthTried){
+                        Write-Host "Failed to submit ticket after verifying session, skipping!" -ForegroundColor Red
+                        $ReAuthTried = $False
+                        return
+                    }
+                    Write-Host "Error occured while submitting SC Task request to SNOW! Retrying..." -ForegroundColor Yellow
+                    if($RetryCount -eq 3){
+                        if(!$ReAuthTried){
+                            Write-Host "Failed to submit ticket 3 times in a row...Verifying Session & Authentication status!" -ForegroundColor Red
+                            Confirm-ServiceNowSession
+                            $ReAuthTried = $True
+                        }
+                    }
+                    $RetryCount += 1
+                }
+            }
+            $Submit_SCTask_2 = ($Submit_SCTask.Content | ConvertFrom-JSON).result
+            write-host $Submit_SCTask_Error -ForegroundColor Red
+
+            if (($Submit_SCTask.StatusCode -eq "200")) {
+                $RequestSysID = $Submit_SCTask_2.sys_id
+
+                #-----Query 'SC_Task' for a record that contains a 'Request' with SysID from above-----
+                $SCTaskQuery = Invoke-RestMethod -Uri "https://$ServiceNow_Server/sc_task.do?JSONv2&sysparm_query=request=$RequestSysID" -WebSession $ServiceNow_Session
+                $global:SCTask_SysID = $SCTaskQuery.records[0].sys_id
+                $global:SCTask_Number = $SCTaskQuery.records[0].number
+
+                Write-Host "*** Successfully Submitted `"$SCTask_Number`" to ServiceNow ***" -ForegroundColor Green
+                if($File -ne ""){
+                    Write-Host "Uploading file ($File) to $SCTask_Number..." -ForegroundColor Yellow
+                    Add-ServiceNowAttachment -TicketType 'sc_task' -TicketSysID $SCTask_SysID -File $File
+                }
+
+                $continue = "true"
+                return $SCTask_Number
+            }else{
+                Write-Host "*** Failed to submit SCTask to ServiceNow ***`nTrying again!" -ForegroundColor Red
+            }
+        }else{
+            $continue = "true"
+            Write-Host "Skipping SCTask creation in Service Now!`nExiting!" -ForegroundColor Red
+        }
+    }
+}
+
+function New-ServiceNowSCTaskAdvanced{
+param(
+$SN_Ticket_Body,
+$File="",
+[switch]$SkipVerification
+)
+    $headers = @{
+        'Accept' = "application/json"
+        'X-UserToken' = $SN_User_Token
+    }
+
+    Write-Host "`n*** SCTask Details Overview ***" -ForegroundColor Yellow
+    Write-Host "$(($SN_Ticket_Body | ft -HideTableHeaders -AutoSize -Wrap | Out-String).Trim())`n" -ForegroundColor Cyan
+
+    $Continue = "false"
+    while ($Continue -eq "false") {
+        if(-not$SkipVerification.IsPresent){
+            Write-Host "`nWould You Like to Submit This SCTask (y/n)? " -ForegroundColor Green -NoNewline
+            $Submit_Confirm = Read-Host
+        }else{
+            $Submit_Confirm = "y"
+        }
+        if ($Submit_Confirm -imatch "^y$") {
+            $RetryCount = 0
+            $ReAuthTried = $False
+            while($True){
+                try{
+                    $Submit_SCTask = Invoke-WebRequest -Uri "https://$ServiceNow_Server/sc_task.do?JSONv2&sysparm_action=insert" -Method "POST" -ContentType "application/json" -Body $($SN_Ticket_Body | ConvertTo-Json) -WebSession $ServiceNow_Session -Headers $headers -ErrorVariable Submit_SCTask_Error
                     break
                 }catch{
                     if($ReAuthTried){
@@ -1123,6 +1198,7 @@ Export-ModuleMember -Function Get-ServiceNowServices
 Export-ModuleMember -Function New-ServiceNowIncident
 Export-ModuleMember -Function New-ServiceNowIncidentAdvanced
 Export-ModuleMember -Function New-ServiceNowSCTask
+Export-ModuleMember -Function New-ServiceNowSCTaskAdvanced
 Export-ModuleMember -Function New-ServiceNowSession
 Export-ModuleMember -Function Search-ServiceNowCustomer
 Export-ModuleMember -Function Update-ServiceNowCategories
