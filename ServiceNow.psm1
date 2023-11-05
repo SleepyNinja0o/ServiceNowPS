@@ -1078,10 +1078,10 @@ param(
     }
 
     #Retrieve and Set Current User Settings
-    if ($SN_Banner_Page.Content -match "window.NOW.user.userID = '(.*?)'") {$global:SN_UserID = $matches[1];write-host "Found User ID: $SN_UserID" -ForegroundColor Green}
-    if ($SN_Banner_Page.Content -match "window.NOW.user_id = '(.*?)'") {$global:SN_UserID = $matches[1];write-host "Found User ID: $SN_UserID" -ForegroundColor Green}
-    if ($SN_Banner_Page.Content -match "`"userID`" : `"(.*?)`",") {$global:SN_UserID = $matches[1];write-host "Found User ID: $SN_UserID" -ForegroundColor Green} #For Admins I believe?
-    if ($SN_Banner_Page.Content -match "g_ck = '(.*)'") {$global:SN_User_Token = $matches[1];write-host "Found User Token: $SN_User_Token`n" -ForegroundColor Green}
+    if ($SN_Banner_Page.Content -match "window.NOW.user.userID = '(.*?)'") {$global:SN_UserID = $matches[1];write-host "User ID: $SN_UserID" -ForegroundColor Green}
+    if ($SN_Banner_Page.Content -match "window.NOW.user_id = '(.*?)'") {$global:SN_UserID = $matches[1];write-host "User ID: $SN_UserID" -ForegroundColor Green}
+    if ($SN_Banner_Page.Content -match "`"userID`" : `"(.*?)`",") {$global:SN_UserID = $matches[1];write-host "User ID: $SN_UserID" -ForegroundColor Green} #For Admins I believe?
+    if ($SN_Banner_Page.Content -match "g_ck = '(.*)'") {$global:SN_User_Token = $matches[1];write-host "Found User Token!`n" -ForegroundColor Green}
 
     $global:SN_User_Profile_Page = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session -Headers @{"X-UserToken"=$SN_User_Token} -ErrorAction Stop).records
 
