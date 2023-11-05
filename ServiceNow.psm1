@@ -877,6 +877,37 @@ $File="",
 }
 
 function New-ServiceNowSCTaskAdvanced{
+<#
+.SYNOPSIS
+Creates a new SCTask in ServiceNow using a custom ticket body.
+
+.DESCRIPTION
+This function allows you to submit an SCTask ticket to ServiceNow using a custom ticket body.
+
+.PARAMETER SN_Ticket_Body
+Specifies the details of the ticket body which is submitted directly to ServiceNow.
+
+.PARAMETER File
+Specifies the path to the file that you want to attach to the ServiceNow ticket.
+
+.PARAMETER SkipVerification
+Skips the manual ticket details verification process before ticket is submitted.
+
+.EXAMPLE
+
+# Example 1: Creates a new SCTask in ServiceNow using a custom ticket body.
+
+$SCTASK_Body = [ordered]@{
+    caller_id                       = "Tuter, Abel"
+    priority                        = "4 - Low"
+    assigned_to                     = "Smith, David"
+    assignment_group                = "IT Support"
+    short_description               = "Short Desc Here"
+    description                     = "Long Desc Here`nLine 2`nLine3"
+}
+
+New-ServiceNowIncidentAdvanced -SN_Ticket_Body $SCTASK_Body
+#>
 param(
 $SN_Ticket_Body,
 $File="",
