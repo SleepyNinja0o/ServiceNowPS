@@ -1029,10 +1029,7 @@ param(
                 "ni.noecho.user_password" = $true
                 "sys_action" = "sysverb_login"
                 "sysparm_login_url" = "welcome.do"} -WebSession $ServiceNow_Session
-        }elseif($CertificateAuth.IsPresent){
-            $global:SN_Cert = Get-AuthCertificate
-            $SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/login.do" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -WebSession $ServiceNow_Session
-        }elseif($Server -match "aesmp\.army\.mil"){          
+        }elseif($Server -match "aesmp\.army\.mil"){
             #Create AESMP web session
             $AESMP_MainPage = Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server" -SessionVariable ServiceNow_Session -Verbose
             $Portal_ID = Parse-String -String $AESMP_MainPage -StartStr "ng-init=`"portal_id = '" -EndStr "'"
@@ -1094,6 +1091,9 @@ param(
             #Login to AESMP using previous SAML login tokens pulled from EAMS
             $AESMP_Login = Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/navpage.do" -WebSession $ServiceNow_Session -Method Post -ContentType "application/x-www-form-urlencoded" -Body $AESMP_Auth_Request
             $SN_Banner_Page = Invoke-WebRequest -UseBasicParsing -Uri "https://$ServiceNow_Server/navpage.do" -WebSession $ServiceNow_Session
+        }elseif($CertificateAuth.IsPresent){
+            $global:SN_Cert = Get-AuthCertificate
+            $SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/login.do" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -WebSession $ServiceNow_Session
         }
 
         if($SN_Banner_Page.StatusCode -ne 200){
