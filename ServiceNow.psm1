@@ -999,6 +999,10 @@ param(
         $Global:ServiceNow_Server = $Server
     }
 
+    if($ServiceNow_Server -match "http|https"){
+        $ServiceNow_Server = ($ServiceNow_Server -replace "(https://|http://)","" -replace "/","")
+    }
+
     Write-Host "Connecting to $ServiceNow_Server..." -ForegroundColor Yellow
     try{
         $SN_Login_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server" -SessionVariable global:ServiceNow_Session -ErrorAction Stop
