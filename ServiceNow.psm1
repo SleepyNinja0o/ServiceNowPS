@@ -1029,7 +1029,7 @@ param(
                 "ni.noecho.user_password" = $true
                 "sys_action" = "sysverb_login"
                 "sysparm_login_url" = "welcome.do"} -WebSession $ServiceNow_Session
-        }elseif($Server -match "aesmp\.army\.mil"){
+        }elseif($ServiceNow_Server -match "aesmp\.army\.mil"){
             #Create AESMP web session
             $AESMP_MainPage = Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server" -SessionVariable ServiceNow_Session -Verbose
             $Portal_ID = Parse-String -String $AESMP_MainPage -StartStr "ng-init=`"portal_id = '" -EndStr "'"
