@@ -18,6 +18,7 @@ Closed Skipped    7
 
 Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
 $Global:ServiceNow_Server = "https://*****.service-now.com"
+$Global:ServiceNow_Lists = @{}
 
 function Parse-String ($String,$StartStr,$EndStr){
     if($String.IndexOf($StartStr) -eq -1){return ""}
@@ -172,7 +173,7 @@ $File
 
 function Close-ServiceNowIncident{
 param(
-$SysID,$State="Closed"
+$SysID,$State
 )
 
     while($True){
@@ -737,8 +738,13 @@ $ServiceNow_Incident_States = Get-ServiceNowList -Name "incident.state"
 param(
 $Name
 )
-
-return (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" -Method "POST" -WebSession $ServiceNow_Session -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=$Name&sysparm_chars=*&sysparm_nomax=true").xml[1].ChildNodes
+    if ($ServiceNow_Lists.Contains($Name)){
+        return $ServiceNow_Lists.$($Name)
+    }else{
+        $List = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" -Method "POST" -WebSession $ServiceNow_Session -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=$Name&sysparm_chars=*&sysparm_nomax=true").xml[1].ChildNodes
+        $ServiceNow_Lists.Add($Name,$List)
+        return $List
+    }
 }
 
 function New-ServiceNowSCTask{
