@@ -727,12 +727,18 @@ param(
 }
 
 function Get-ServiceNowList{
+<#
+.SYNOPSIS
+Retrieves a Choice/Pick list's labels and values in ServiceNow.
+
+.EXAMPLE
+$ServiceNow_Incident_States = Get-ServiceNowList -Name "incident.state"
+#>
 param(
 $Name
 )
 
 return (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" -Method "POST" -WebSession $ServiceNow_Session -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=$Name&sysparm_chars=*&sysparm_nomax=true").xml[1].ChildNodes
-
 }
 
 function New-ServiceNowSCTask{
