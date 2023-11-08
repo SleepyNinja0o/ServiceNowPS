@@ -252,7 +252,7 @@ function Get-File {
 
 function Get-MimeType {
     param( 
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true, Position=0)] 
+        [Parameter(Mandatory, ValueFromPipeline=$true, Position=0)] 
         [ValidateScript({Test-Path $_})]
         [String]$File
         )
@@ -304,24 +304,16 @@ function Get-ServiceNowGroups {
 
 function Get-ServiceNowRecord{
 param(
-[Parameter(Mandatory=$true)]
+[Parameter(Mandatory)]
 [ValidateSet("ChangeRequest","ChangeTask","CustomerServiceCase","Group","Incident","Request","RequestItem","ScheduledTask","User","ConfigurationItem")]
 $RecordType,
-[Parameter(Mandatory=$false)]
 $SysID,
-[Parameter(Mandatory=$false)]
 $FirstName,
-[Parameter(Mandatory=$false)]
 $LastName,
-[Parameter(Mandatory=$false)]
 $GroupName,
-[Parameter(Mandatory=$false)]
 $ComputerName,
-[Parameter(Mandatory=$false)]
 $GroupNameSearch,
-[Parameter(Mandatory=$false)]
 $TicketNumber,
-[Parameter(Mandatory=$false)]
 $TicketSearch
 )
     if (!$ServiceNow_Session){Confirm-ServiceNowSession}
