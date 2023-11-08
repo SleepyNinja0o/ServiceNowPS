@@ -305,7 +305,7 @@ function Get-ServiceNowGroups {
 function Get-ServiceNowRecord{
 param(
 [Parameter(Mandatory=$true)]
-[ValidateSet("ChangeRequest","ChangeTask","Group","Incident","Request","RequestItem","ScheduledTask","User","ConfigurationItem")]
+[ValidateSet("ChangeRequest","ChangeTask","CustomerServiceCase","Group","Incident","Request","RequestItem","ScheduledTask","User","ConfigurationItem")]
 $RecordType,
 [Parameter(Mandatory=$false)]
 $SysID,
@@ -440,6 +440,18 @@ $TicketSearch
                 $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=name=$ComputerName" -WebSession $ServiceNow_Session).records
             }else{
                 Write-Host "A SysID or Computer Name is required to run this command." -ForegroundColor Red
+                return
+            }
+            return $ServiceNowRecord
+        }
+        "customerservicecase" {
+            $RecordTypeURL = "sn_customerservice_case_list.do"
+            if ($SysID){
+                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_sys_id=$SysID" -WebSession $ServiceNow_Session).records
+            }elseif($TicketNumber){
+                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=number=$TicketNumber" -WebSession $ServiceNow_Session).records
+            }else{
+                Write-Host "A SysID or Ticket Number is required to run this command." -ForegroundColor Red
                 return
             }
             return $ServiceNowRecord
