@@ -172,12 +172,12 @@ $File
 
 function Close-ServiceNowIncident{
 param(
-$SysID
+$SysID,$State="Closed"
 )
 
     while($True){
         try{
-            $body = @{"state" = 8} | ConvertTo-Json -Compress #8 is for cancel
+            $body = @{"state" = $State} | ConvertTo-Json -Compress #8 is for cancel
             $Cancel_Incident = Invoke-RestMethod "https://$ServiceNow_Server/incident_list.do?JSONv2&sysparm_sys_id=$SysID&sysparm_action=update" -WebSession $ServiceNow_Session `
             -Method Post -ContentType "application/json" -Body $body -ErrorVariable Modify_Incident_Error
             break
