@@ -726,6 +726,15 @@ param(
     }
 }
 
+function Get-ServiceNowList{
+param(
+$Name
+)
+
+return (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" -Method "POST" -WebSession $ServiceNow_Session -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=$Name&sysparm_chars=*&sysparm_nomax=true").xml[1].ChildNodes
+
+}
+
 function New-ServiceNowSCTask{
 param(
 [Parameter(Mandatory)]
@@ -1238,6 +1247,7 @@ Export-ModuleMember -Function Get-ServiceNowRecord
 Export-ModuleMember -Function Get-ServiceNowServices
 Export-ModuleMember -Function New-ServiceNowIncident
 Export-ModuleMember -Function New-ServiceNowIncidentAdvanced
+Export-ModuleMember -Function Get-ServiceNowList
 Export-ModuleMember -Function New-ServiceNowSCTask
 Export-ModuleMember -Function New-ServiceNowSCTaskAdvanced
 Export-ModuleMember -Function New-ServiceNowSession
