@@ -333,7 +333,7 @@ $TicketSearch
                 Write-Host "A Sys ID or First/Last name is required to run this command." -ForegroundColor Red
                 return
             }
-            return
+            return $ServiceNowRecord
         }
         "group" {
             $RecordTypeURL = "sys_user_group_list.do"
