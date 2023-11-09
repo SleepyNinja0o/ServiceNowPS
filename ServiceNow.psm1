@@ -193,29 +193,7 @@ $SysID,$TicketNum,$State,$CloseCode,$CloseNotes
         $body = @{"state" = $State} | ConvertTo-Json -Compress
     }
 
-    while($True){
-        try{
-            $Cancel_Incident = Invoke-RestMethod "https://$ServiceNow_Server/incident_list.do?JSONv2&sysparm_sys_id=$SysID&sysparm_action=update" -WebSession $ServiceNow_Session `
-            -Method Post -ContentType "application/json" -Body $body -ErrorVariable Modify_Incident_Error
-            break
-        }catch{
-            if($ReAuthTried){
-                Write-Host "Failed to submit ticket after verifying session, skipping!" -ForegroundColor Red
-                $ReAuthTried = $False
-                return
-            }
-            Write-Host "Error occured while submitting SC Task request to SNOW! Retrying..." -ForegroundColor Yellow
-            if($RetryCount -eq 3){
-                if(!$ReAuthTried){
-                    Write-Host "Failed to submit ticket 3 times in a row...Verifying Session & Authentication status!" -ForegroundColor Red
-                    Confirm-ServiceNowSession
-                    $ReAuthTried = $True
-                }
-            }
-            $RetryCount += 1
-        }
-    }
-    return $Cancel_Incident.records
+    return (New-ServiceNowWebRequest -Endpoint "/incident_list.do?JSONv2&sysparm_sys_id=$SysID&sysparm_action=update" -Method Post -ContentType "application/json" -Body $body -REST).records
 }
 
 function Close-ServiceNowSession{
@@ -1180,11 +1158,13 @@ param(
 function New-ServiceNowWebRequest{
 param(
     $Endpoint,
-    $Method="Get",
+    [ValidateSet("Get","Post")]$Method="Get",
     $ContentType="",
     $Body,
     [switch]$REST
 )
+    if (!$ServiceNow_Session){Confirm-ServiceNowSession}
+
     for($Retry=1;$Retry -le 3;$Retry++){
         try{
             if($REST.IsPresent){
