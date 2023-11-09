@@ -9,7 +9,4 @@ The JSONv2 web service does not require API access, it only requires the "ITIL" 
 ```
 #Username/Password authentication
 New-ServiceNowSession -Server "******.service-now.com" -Username "admin" -Pass "pass"
-
-#SmartCard authentication
-New-ServiceNowSession -Server "******.service-now.com" -CertificateAuth
 ```
