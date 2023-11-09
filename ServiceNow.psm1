@@ -1177,6 +1177,47 @@ param(
     New-SNSessionRefresher
 }
 
+function New-ServiceNowWebRequest{
+param(
+    $Endpoint,
+    $Method="Get",
+    $ContentType="",
+    $Body,
+    [switch]$REST
+)
+    for($Retry=1;$Retry -le 3;$Retry++){
+        try{
+            if($REST.IsPresent){
+                if($Body -ne $null -and $Body -ne ""){
+                    $ServiceNow_WR = Invoke-RestMethod "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
+                    -Method $Method -ContentType $ContentType -Body $Body
+                }else{
+                    $ServiceNow_WR = Invoke-RestMethod "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
+                    -Method $Method
+                }
+            }else{
+                if($Body -ne $null -and $Body -ne ""){
+                    $ServiceNow_WR = Invoke-WebRequest "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
+                    -Method $Method -ContentType $ContentType -Body $Body
+                }else{
+                    $ServiceNow_WR = Invoke-WebRequest "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
+                    -Method $Method
+                }
+            }
+            return $ServiceNow_WR
+        }catch{
+            if($Retry -eq 3){
+                Write-Host "Failed to submit web request 3 times in a row...Try again?(y/n): " -ForegroundColor Red -NoNewline
+                $resp = Read-Host
+                if($resp.ToLower() -match "y|yes"){$Retry=0}else{return}
+            }else{
+                Write-Host "Error occured while submitting web request to SNOW! Retrying..." -ForegroundColor Yellow
+                Start-Sleep -Seconds 2
+            }
+        }
+    }
+}
+
 function New-SNSessionRefresher{
     $global:ServiceNow_Session_Timer = New-Object System.Timers.Timer
 
