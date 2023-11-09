@@ -173,12 +173,28 @@ $File
 
 function Close-ServiceNowIncident{
 param(
-$SysID,$State
+$SysID,$TicketNum,$State,$CloseCode,$CloseNotes
 )
+    #If TicketNum provided, pull SysID
+    if($TicketNum -ne "" -and $TicketNum -ne $null){$SysID = (Get-ServiceNowRecord -RecordType Incident -TicketNumber $TicketNum).sys_id}
+    #If SysID doesn't exist, exit function
+    if($SysID -eq "" -or $SysID -eq $null){Write-Host "Missing Incident SysID! Please provide and try again!" -ForegroundColor Red;return}
+    
+    #If State is not integer, convert it
+    try{[int]$State}catch{try{$State = (Get-ServiceNowList -Name 'incident.state' | where {$_.name -eq $State}).value}catch{Write-Host "Error converting Incident State to an integer value!" -ForegroundColor Red;return}}
+
+    #If State is Resolved, verify CloseCode and CloseNotes were provided and not Null or Blank
+    if($State -eq (Get-ServiceNowList -Name 'incident.state' | where {$_.name -eq "Resolved"}).value){
+        if ($CloseNotes -eq "" -or $CloseNotes -eq $null){Write-Host "Please provide a Close Note for a Resolution." -ForegroundColor Red;return}
+        if ($CloseCode -eq "" -or $CloseCode -eq $null){Write-Host "Please provide a Close Code for a Resolution." -ForegroundColor Red;return}
+        if( -not ((Get-ServiceNowList -Name 'incident.close_code').value.Contains($CloseCode)) ){Write-Host "Incident Close Code is not valid. Please try again!" -ForegroundColor Red;return}
+        $body = @{"state" = $State;"close_code"=$CloseCode;"close_notes"=$CloseNotes} | ConvertTo-Json -Compress
+    }else{
+        $body = @{"state" = $State} | ConvertTo-Json -Compress
+    }
 
     while($True){
         try{
-            $body = @{"state" = $State} | ConvertTo-Json -Compress #8 is for cancel
             $Cancel_Incident = Invoke-RestMethod "https://$ServiceNow_Server/incident_list.do?JSONv2&sysparm_sys_id=$SysID&sysparm_action=update" -WebSession $ServiceNow_Session `
             -Method Post -ContentType "application/json" -Body $body -ErrorVariable Modify_Incident_Error
             break
