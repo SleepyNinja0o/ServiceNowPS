@@ -1,21 +1,3 @@
-<#
-Incident States:
-New         1
-In Progress 2
-On Hold     3
-Resolved    6
-Closed      7
-Canceled    8
-
-SCTASK States:
-Pending           -5
-Open              1
-Work in Progress  2
-Closed Complete   3
-Closed Incomplete 4
-Closed Skipped    7
-#>
-
 Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
 $Global:ServiceNow_Server = "https://*****.service-now.com"
 $Global:ServiceNow_Lists = @{}
@@ -33,6 +15,7 @@ function Parse-String ($String,$StartStr,$EndStr){
     return ""
 }
 
+#CONVERTED to New-ServiceNowWebRequest
 function Add-ServiceNowAttachment{
 <#
 .SYNOPSIS
@@ -160,7 +143,8 @@ $File
     ) -join $LF
 
     try{
-        $global:SN_Submit_Attachment = Invoke-WebRequest -Uri "https://$ServiceNow_Server/sys_attachment.do?sysparm_record_scope=global" -Method "POST" -ContentType "multipart/form-data; boundary=---------------------------$SN_Attachment_GUID" -Body $SN_Attachment_Body -WebSession $ServiceNow_Session
+        #$global:SN_Submit_Attachment = Invoke-WebRequest -Uri "https://$ServiceNow_Server/sys_attachment.do?sysparm_record_scope=global" -Method "POST" -ContentType "multipart/form-data; boundary=---------------------------$SN_Attachment_GUID" -Body $SN_Attachment_Body -WebSession $ServiceNow_Session
+        $global:SN_Submit_Attachment = New-ServiceNowWebRequest -Endpoint "/sys_attachment.do?sysparm_record_scope=global" -Method Post -ContentType "multipart/form-data; boundary=---------------------------$SN_Attachment_GUID" -Body $SN_Attachment_Body
         if ($SN_Submit_Attachment.StatusCode -eq "200") {
             Write-Host "*** Successfully Submitted Attachment `"$SN_Attachment_FileName`" for Ticket $TicketNumber ***" -ForegroundColor Green
         }else{
@@ -171,6 +155,7 @@ $File
     }
 }
 
+#CONVERTED to New-ServiceNowWebRequest
 function Close-ServiceNowIncident{
 param(
 $SysID,$TicketNum,$State,$CloseCode,$CloseNotes
@@ -201,10 +186,12 @@ function Close-ServiceNowSession{
     if($ServiceNow_Session_Timer){$ServiceNow_Session_Timer.enabled = $false}
     Remove-Variable -Name "ServiceNow_*", "SN_*" -Scope Global -ErrorAction SilentlyContinue
 }
-    
+
+#CONVERTED to New-ServiceNowWebRequest
 function Confirm-ServiceNowSession{
     if($ServiceNow_Session){
-        $SN_User_Profile_Page_Refresh = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session).records
+        #$SN_User_Profile_Page_Refresh = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session).records
+        $SN_User_Profile_Page_Refresh = (New-ServiceNowWebRequest -Endpoint "/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -REST).records
         $SN_DisplayName_Refresh = $SN_User_Profile_Page_Refresh.name
 
         if($SN_DisplayName -ne $SN_DisplayName_Refresh){
@@ -297,6 +284,7 @@ function Get-ServiceNowGroups {
     }
 }
 
+#CONVERTED to New-ServiceNowWebRequest
 function Get-ServiceNowList{
 <#
 .SYNOPSIS
@@ -311,12 +299,14 @@ $Name
     if ($ServiceNow_Lists.Contains($Name)){
         return $ServiceNow_Lists.$($Name)
     }else{
-        $List = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" -Method "POST" -WebSession $ServiceNow_Session -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=$Name&sysparm_chars=*&sysparm_nomax=true").xml[1].ChildNodes
+        #$List = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" -Method "POST" -WebSession $ServiceNow_Session -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=$Name&sysparm_chars=*&sysparm_nomax=true").xml[1].ChildNodes
+        $List = (New-ServiceNowWebRequest -Endpoint "/xmlhttp.do" -Method Post -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=$Name&sysparm_chars=*&sysparm_nomax=true" -REST).xml[1].ChildNodes
         $ServiceNow_Lists.Add($Name,$List)
         return $List
     }
 }
 
+#CONVERTED to New-ServiceNowWebRequest
 function Get-ServiceNowRecord{
 param(
 [Parameter(Mandatory)]
@@ -337,145 +327,135 @@ $TicketSearch
         "user" {
             $RecordTypeURL = "sys_user_list.do"
             if ($SysID){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_sys_id=$SysID" -WebSession $ServiceNow_Session).records
+                $SN_Query = "sys_id=$SysID"
             }elseif($FirstName -and $LastName){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=last_name=$LastName^first_name=$FirstName" -WebSession $ServiceNow_Session).records
+                $SN_Query = "last_name=$LastName^first_name=$FirstName"
             }elseif($FirstName){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=last_name=$FirstName" -WebSession $ServiceNow_Session).records
+                $SN_Query = "first_name=$FirstName"
             }elseif($LastName){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=last_name=$LastName" -WebSession $ServiceNow_Session).records
+                $SN_Query = "last_name=$LastName"
             }else{
                 Write-Host "A Sys ID or First/Last name is required to run this command." -ForegroundColor Red
                 return
             }
-            return $ServiceNowRecord
         }
         "group" {
             $RecordTypeURL = "sys_user_group_list.do"
             if ($SysID){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_sys_id=$SysID" -WebSession $ServiceNow_Session).records
+                $SN_Query = "sys_id=$SysID"
             }elseif($GroupName){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=name=$GroupName" -WebSession $ServiceNow_Session).records
+                $SN_Query = "name=$GroupName"
             }elseif($GroupNameSearch){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=nameLIKE$GroupNameSearch" -WebSession $ServiceNow_Session).records | select assignment_group,closed_at,closed_by,description,impact,number,opened_by,parent,priority,short_description,state,sys_created_on,sys_id,sys_updated_by,sys_updated_on,urgency
+                $SN_Query = "nameLIKE$GroupNameSearch" #-WebSession $ServiceNow_Session).records   #| select assignment_group,closed_at,closed_by,description,impact,number,opened_by,parent,priority,short_description,state,sys_created_on,sys_id,sys_updated_by,sys_updated_on,urgency
             }else{
                 Write-Host "A Sys ID or Group name is required to run this command." -ForegroundColor Red
                 return
             }
-            return $ServiceNowRecord
         }
         "scheduledtask" {
             $RecordTypeURL = "sc_task_list.do"
             if ($SysID){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_sys_id=$SysID" -WebSession $ServiceNow_Session).records
+                $SN_Query = "sys_id=$SysID"
             }elseif($TicketNumber){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=number=$TicketNumber" -WebSession $ServiceNow_Session).records
+                $SN_Query = "number=$TicketNumber"
             }elseif($TicketSearch){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=short_descriptionLIKE$TicketSearch^ORdescriptionLIKE$TicketSearch" -WebSession $ServiceNow_Session).records
+                $SN_Query = "short_descriptionLIKE$TicketSearch^ORdescriptionLIKE$TicketSearch"
             }else{
                 Write-Host "A SysID or Ticket Number is required to run this command." -ForegroundColor Red
                 return
             }
-            return $ServiceNowRecord
         }
         "changerequest" {
             $RecordTypeURL = "change_request_list.do"
             if ($SysID){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_sys_id=$SysID" -WebSession $ServiceNow_Session).records
+                $SN_Query = "sys_id=$SysID"
             }elseif($TicketNumber){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=number=$TicketNumber" -WebSession $ServiceNow_Session).records
+                $SN_Query = "number=$TicketNumber"
             }else{
                 Write-Host "A SysID or Ticket Number is required to run this command." -ForegroundColor Red
                 return
             }
-            return $ServiceNowRecord
         }
         "changetask" {
             $RecordTypeURL = "change_task_list.do"
             if ($SysID){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_sys_id=$SysID" -WebSession $ServiceNow_Session).records
+                $SN_Query = "sys_id=$SysID"
             }elseif($TicketNumber){
                 #https://$ServiceNow_Server/sc_task_list.do?sysparm_query=number%3DSCTASK0345015&sysparm_first_row=1&sysparm_view=
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=number=$TicketNumber" -WebSession $ServiceNow_Session).records
+                $SN_Query = "number=$TicketNumber"
             }else{
                 Write-Host "A SysID or Ticket Number is required to run this command." -ForegroundColor Red
                 return
             }
-            return $ServiceNowRecord
         }
         "incident" {
             $RecordTypeURL = "incident_list.do"
             if ($SysID){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_sys_id=$SysID" -WebSession $ServiceNow_Session).records
+                $SN_Query = "sys_id=$SysID"
             }elseif($TicketNumber){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=number=$TicketNumber" -WebSession $ServiceNow_Session).records
+                $SN_Query = "number=$TicketNumber"
             }else{
                 Write-Host "A SysID or Ticket Number is required to run this command." -ForegroundColor Red
                 return
             }
-            return $ServiceNowRecord
         }
         "request" {
             $RecordTypeURL = "sc_request_list.do"
             if ($SysID){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_sys_id=$SysID" -WebSession $ServiceNow_Session).records
+                $SN_Query = "sys_id=$SysID"
             }elseif($TicketNumber){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=number=$TicketNumber" -WebSession $ServiceNow_Session).records
+                $SN_Query = "number=$TicketNumber"
             }else{
                 Write-Host "A SysID or Ticket Number is required to run this command." -ForegroundColor Red
                 return
             }
-            return $ServiceNowRecord
         }
         "requestitem" {
             $RecordTypeURL = "sc_req_item_list.do"
             if ($SysID){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_sys_id=$SysID" -WebSession $ServiceNow_Session).records
+                $SN_Query = "sys_id=$SysID"
             }elseif($TicketNumber){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=number=$TicketNumber" -WebSession $ServiceNow_Session).records
+                $SN_Query = "number=$TicketNumber"
             }else{
                 Write-Host "A SysID or Ticket Number is required to run this command." -ForegroundColor Red
                 return
             }
-            return $ServiceNowRecord
         }
         "configurationitem" {
             $RecordTypeURL = "cmdb_ci_pc_hardware.do"
             if ($SysID){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_sys_id=$SysID" -WebSession $ServiceNow_Session).records
+                $SN_Query = "sys_id=$SysID"
             }elseif($ComputerName){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=name=$ComputerName" -WebSession $ServiceNow_Session).records
+                $SN_Query = "name=$ComputerName"
             }else{
                 Write-Host "A SysID or Computer Name is required to run this command." -ForegroundColor Red
                 return
             }
-            return $ServiceNowRecord
         }
         "customerservicecase" {
             $RecordTypeURL = "sn_customerservice_case_list.do"
             if ($SysID){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_sys_id=$SysID" -WebSession $ServiceNow_Session).records
+                $SN_Query = "sys_id=$SysID"
             }elseif($TicketNumber){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=number=$TicketNumber" -WebSession $ServiceNow_Session).records
+                $SN_Query = "number=$TicketNumber"
             }else{
                 Write-Host "A SysID or Ticket Number is required to run this command." -ForegroundColor Red
                 return
             }
-            return $ServiceNowRecord
         }
         Default {
-            $RecordTypeURL = "sc_task_list.do"
+            $RecordTypeURL = "incident_list.do"
             if ($SysID){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_sys_id=$SysID" -WebSession $ServiceNow_Session).records
+                $SN_Query = "sys_id=$SysID"
             }elseif($TicketNumber){
-                $global:ServiceNowRecord = (Invoke-RestMethod -Method Get -Uri "https://$ServiceNow_Server/$($RecordTypeURL)?JSONv2&sysparm_query=number=$TicketNumber" -WebSession $ServiceNow_Session).records
+                $SN_Query = "number=$TicketNumber"
             }else{
                 Write-Host "A SysID or Ticket Number is required to run this command." -ForegroundColor Red
                 return
             }
-            return $ServiceNowRecord
         }
     }
+    return (New-ServiceNowWebRequest -Endpoint "/$($RecordTypeURL)?JSONv2&sysparm_query=$SN_Query" -REST).records
 }
 
 function Get-ServiceNowServices {
@@ -499,6 +479,8 @@ function Get-ServiceNowServices {
     }
 }
 
+#CONVERTED to New-ServiceNowWebRequest
+#ALSO Needs cleaned up
 function New-ServiceNowIncident{
 param(
 [Parameter(Mandatory)]
@@ -568,17 +550,17 @@ $File="",
         contact_type                    = $SN_Ticket_ContactType
         severity                        = $SN_Ticket_Impact
         urgency                         = $SN_Ticket_Urgency
-        #due_date                        = $SN_Ticket_DueDate
         assignment_group                = $SN_Ticket_AssignmentGroup
         assigned_to                     = $SN_Ticket_AssignedTo
         short_description               = $SN_Ticket_ShortDescription
         description                     = $SN_Ticket_Description
     }
+     $SN_Ticket_Body = $SN_Ticket_Body | ConvertTo-Json
 
-    $SN_Ticket_Headers = @{
-        'Accept' = "application/json"
-        'X-UserToken' = $SN_User_Token
-    }
+    #$SN_Ticket_Headers = @{
+    #    'Accept' = "application/json"
+    #    'X-UserToken' = $SN_User_Token
+    #}
 
     Write-Host "`n*** Incident Details Overview ***" -ForegroundColor Yellow
     Write-Host "`nCustomer:" -ForegroundColor Cyan
@@ -609,9 +591,11 @@ $File="",
     if($confirm.ToLower() -eq "y"){
         $RetryCount = 0
         $ReAuthTried = $False
+        <#
         while($True){
-            try{
-                $Submit_INC = Invoke-WebRequest -Uri "https://$ServiceNow_Server/incident.do?JSONv2&sysparm_action=insert" -Method "POST" -ContentType "application/json" -Headers $SN_Ticket_Headers -Body $($SN_Ticket_Body | ConvertTo-Json) -WebSession $ServiceNow_Session
+            try{#STOPPED RIGHT HERE
+                #$Submit_INC = Invoke-WebRequest -Uri "https://$ServiceNow_Server/incident.do?JSONv2&sysparm_action=insert" -Method "POST" -ContentType "application/json" -Headers $SN_Ticket_Headers -Body $($SN_Ticket_Body | ConvertTo-Json) -WebSession $ServiceNow_Session
+                $Submit_INC = New-ServiceNowWebRequest -Endpoint "/incident.do?JSONv2&sysparm_action=insert" -Method Post -ContentType "application/json" -Body $SN_Ticket_Body -REST
                 break
             }catch{
                 if($ReAuthTried){
@@ -630,6 +614,8 @@ $File="",
                 $RetryCount += 1
             }
         }
+        #>
+        $Submit_INC = New-ServiceNowWebRequest -Endpoint "/incident.do?JSONv2&sysparm_action=insert" -Method Post -ContentType "application/json" -Body $SN_Ticket_Body
         $Submit_INC_2 = ($Submit_INC.Content | ConvertFrom-JSON).records[0]
         if (($Submit_INC.StatusCode -eq "200")) {
             $Global:INC_Number = $Submit_INC_2.number
@@ -645,6 +631,8 @@ $File="",
     }
 }
 
+#CONVERTED to New-ServiceNowWebRequest
+#ALSO Needs cleaned up
 function New-ServiceNowIncidentAdvanced{
 <#
 .SYNOPSIS
@@ -687,10 +675,10 @@ param(
 [String]$File="",
 [switch]$SkipVerification
 )
-    $SN_Ticket_Headers = @{
-        'Accept' = "application/json"
-        'X-UserToken' = $SN_User_Token
-    }
+    #$SN_Ticket_Headers = @{
+    #    'Accept' = "application/json"
+    #    'X-UserToken' = $SN_User_Token
+    #}
 
     Write-Host "`n*** Incident Details Overview ***" -ForegroundColor Yellow
     Write-Host "$(($SN_Ticket_Body | ft -HideTableHeaders -AutoSize -Wrap | Out-String).Trim())`n" -ForegroundColor Cyan
@@ -702,6 +690,7 @@ param(
     }
 
     if($confirm.ToLower() -eq "y"){
+        <#
         $RetryCount = 0
         $ReAuthTried = $False
         while($True){
@@ -725,6 +714,9 @@ param(
                 $RetryCount += 1
             }
         }
+        #>
+        $SN_Ticket_Body = $SN_Ticket_Body | ConvertTo-Json
+        New-ServiceNowWebRequest -Endpoint "/incident.do?JSONv2&sysparm_action=insert" -Method Post -ContentType "application/json" -Body $SN_Ticket_Body
         $Submit_INC_2 = ($Submit_INC.Content | ConvertFrom-JSON).records[0]
         if (($Submit_INC.StatusCode -eq "200")) {
             $Global:INC_Number = $Submit_INC_2.number
@@ -741,6 +733,7 @@ param(
     }
 }
 
+#SKIPPING New-ServiceNowWebRequest Conversion for now...
 function New-ServiceNowSCTask{
 param(
 [Parameter(Mandatory)]
@@ -895,6 +888,7 @@ $File="",
     }
 }
 
+#SKIPPING New-ServiceNowWebRequest Conversion for now...
 function New-ServiceNowSCTaskAdvanced{
 <#
 .SYNOPSIS
@@ -1001,6 +995,7 @@ $File="",
     }
 }
 
+#SKIPPING New-ServiceNowWebRequest Conversion for now...
 function New-ServiceNowSession{
 param(
     $Server,
@@ -1169,18 +1164,18 @@ param(
         try{
             if($REST.IsPresent){
                 if($Body -ne $null -and $Body -ne ""){
-                    $ServiceNow_WR = Invoke-RestMethod "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
+                    $ServiceNow_WR = Invoke-RestMethod -UseBasicParsing "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
                     -Method $Method -ContentType $ContentType -Body $Body
                 }else{
-                    $ServiceNow_WR = Invoke-RestMethod "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
+                    $ServiceNow_WR = Invoke-RestMethod -UseBasicParsing "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
                     -Method $Method
                 }
             }else{
                 if($Body -ne $null -and $Body -ne ""){
-                    $ServiceNow_WR = Invoke-WebRequest "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
+                    $ServiceNow_WR = Invoke-WebRequest -UseBasicParsing "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
                     -Method $Method -ContentType $ContentType -Body $Body
                 }else{
-                    $ServiceNow_WR = Invoke-WebRequest "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
+                    $ServiceNow_WR = Invoke-WebRequest -UseBasicParsing "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
                     -Method $Method
                 }
             }
@@ -1198,6 +1193,7 @@ param(
     }
 }
 
+#CONVERTED to New-ServiceNowWebRequest
 function New-SNSessionRefresher{
     $global:ServiceNow_Session_Timer = New-Object System.Timers.Timer
 
@@ -1205,7 +1201,8 @@ function New-SNSessionRefresher{
         $ServiceNow_Session_Expires = ($ServiceNow_Session.Cookies.GetCookies("https://$ServiceNow_Server") | where {$_.Name -eq "glide_session_store"}).Expires
         $global:ServiceNow_Session_Expires_Minutes = [math]::Floor((New-TimeSpan -Start (Get-Date) -End $ServiceNow_Session_Expires).TotalMinutes)
 
-        $SN_User_Profile_Page_Refresh = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session).records
+        #$SN_User_Profile_Page_Refresh = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session).records
+        $SN_User_Profile_Page_Refresh = (New-ServiceNowWebRequest -Endpoint "/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -REST).records
         $SN_DisplayName_Refresh = $SN_User_Profile_Page_Refresh.name
 
         if($SN_DisplayName -ne $SN_DisplayName_Refresh){
@@ -1222,6 +1219,8 @@ function New-SNSessionRefresher{
     $ServiceNow_Session_Timer.Enabled = $True
 }
 
+#SKIPPING New-ServiceNowWebRequest Conversion for now...
+#Need code review
 function Search-ServiceNowCustomer{
 param($Name)
     return (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" `
@@ -1231,6 +1230,8 @@ param($Name)
     -Body "sysparm_processor=Reference&sysparm_scope=global&sysparm_want_session_messages=true&ni.nolog.x_referer=ignore&sysparm_name=incident.caller_id&sysparm_max=15&sysparm_chars=$Name&sysparm_value=&ac_columns=user_name;u_district;email&ac_order_by=name").xml.ChildNodes
 }
 
+#SKIPPING New-ServiceNowWebRequest Conversion for now...
+#Need code review - CAN BE IMPROVED
 function Update-ServiceNowCategories {
     Confirm-ServiceNowSession
 
@@ -1244,7 +1245,7 @@ function Update-ServiceNowCategories {
         "X-UserToken"=$SN_User_Token
     } `
     -ContentType "application/x-www-form-urlencoded; charset=UTF-8" `
-    -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=incident.category&sysparm_chars=*&sysparm_nomax=true&ni.nolog.x_referer=ignore&x_referer=incident.do").xml[1].ChildNodes.Name
+    -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=incident.category&sysparm_chars=*&sysparm_nomax=true").xml[1].ChildNodes.Name
 
     foreach($Cat in $CategoryList){
         if($i%5 -eq 0){
@@ -1257,7 +1258,7 @@ function Update-ServiceNowCategories {
             "X-UserToken"=$SN_User_Token
         } `
         -ContentType "application/x-www-form-urlencoded; charset=UTF-8" `
-        -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_value=$cat&sysparm_name=incident.subcategory&sysparm_chars=*&sysparm_nomax=true&ni.nolog.x_referer=ignore&x_referer=incident.do"
+        -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_value=$cat&sysparm_name=incident.subcategory&sysparm_chars=*&sysparm_nomax=true"
 
         $CategoryListHash[$Cat] = $wr.xml[1].ChildNodes.name
         $i++
@@ -1267,6 +1268,8 @@ function Update-ServiceNowCategories {
     Write-Host "`nService Now Categories JSON file updated successfully!" -ForegroundColor Green
 }
 
+#SKIPPING New-ServiceNowWebRequest Conversion for now...
+#Need code review - CAN BE IMPROVED
 function Update-ServiceNowGroups {
     Confirm-ServiceNowSession
 
@@ -1275,6 +1278,8 @@ function Update-ServiceNowGroups {
     Write-Host "Service Now Groups JSON file updated successfully!" -ForegroundColor Green
 }
 
+#SKIPPING New-ServiceNowWebRequest Conversion for now...
+#Need code review - CAN BE IMPROVED
 function Update-ServiceNowServices {
     Confirm-ServiceNowSession
 
@@ -1297,67 +1302,10 @@ Export-ModuleMember -Function Get-ServiceNowServices
 Export-ModuleMember -Function New-ServiceNowIncident
 Export-ModuleMember -Function New-ServiceNowIncidentAdvanced
 Export-ModuleMember -Function Get-ServiceNowList
-Export-ModuleMember -Function New-ServiceNowSCTask
-Export-ModuleMember -Function New-ServiceNowSCTaskAdvanced
+#Export-ModuleMember -Function New-ServiceNowSCTask           #This functions needs additional review/recoding
+#Export-ModuleMember -Function New-ServiceNowSCTaskAdvanced   #This functions needs additional review/recoding
 Export-ModuleMember -Function New-ServiceNowSession
-Export-ModuleMember -Function Search-ServiceNowCustomer
+#Export-ModuleMember -Function Search-ServiceNowCustomer      #This functions needs additional review/recoding
 Export-ModuleMember -Function Update-ServiceNowCategories
 Export-ModuleMember -Function Update-ServiceNowGroups
 Export-ModuleMember -Function Update-ServiceNowServices
-
-
-<#
-
-Get Incidents - Max Record Count 5
-$incidents = irm -Uri "https://$ServiceNow_Server/incident_list.do?JSONv2&sysparm_record_count=5" -WebSession $ServiceNow_Session
-
-Get Incident Categories
-$incidentCategories = irm -Uri "https://$ServiceNow_Server/sys_choice.do?JSONv2&sysparm_query=name=incident^element=category^ORDERBYname" -WebSession $ServiceNow_Session
-$incidentCategories.records | select label, sequence, sys_id
-
-Get Incident Subcategories
-$incidentSubcategories = irm -Uri "https://$ServiceNow_Server/sys_choice.do?JSONv2&sysparm_query=name=incident^element=subcategory^ORDERBYname" -WebSession $ServiceNow_Session
-$incidentSubcategories.records | select label, dependent_value, sys_id
-
-Get Incident States
-$incidentStates = irm -Uri "https://$ServiceNow_Server/sys_choice.do?JSONv2&sysparm_query=name=incident^element=state^ORDERBYname" -WebSession $ServiceNow_Session
-$incidentStates.records | select label, sequence, sys_id
-
-Get Incident Channels
-$incidentChannels = irm -Uri "https://$ServiceNow_Server/sys_choice.do?JSONv2&sysparm_query=name=incident^element=contact_type^ORDERBYname" -WebSession $ServiceNow_Session
-$incidentChannels.records | select label, sequence, sys_id
-
-Get Incident Impact
-$incidentImpacts = irm -Uri "https://$ServiceNow_Server/sys_choice.do?JSONv2&sysparm_query=name=incident^element=severity^ORDERBYname" -WebSession $ServiceNow_Session
-$incidentImpacts.records | select label, sequence, sys_id
-
-Get Incident Urgency
-$incidentUrgencies = irm -Uri "https://$ServiceNow_Server/sys_choice.do?JSONv2&sysparm_query=name=incident^element=severity^ORDERBYname" -WebSession $ServiceNow_Session
-$incidentUrgencies.records | select label, sequence, sys_id
-
-
-
-
-
-
-Get Services
-$incidentServices = irm -Uri "https://$ServiceNow_Server/cmdb_ci_service_list.do?JSONv2" -WebSession $ServiceNow_Session
-$incidentServices.records
-
-Get Service Offerings
-$incidentServiceOfferings = irm -Uri "https://$ServiceNow_Server/service_offering_list.do?JSONv2" -WebSession $ServiceNow_Session
-$incidentServicesOfferings.records
-
-Get Configuration Items
-$incidentConfigItems = irm -Uri "https://$ServiceNow_Server/cmdb_ci_list.do?JSONv2" -WebSession $ServiceNow_Session
-$incidentConfigItems.records
-
-Get Assignment Groups
-$incidentGroups = irm -Uri "https://$ServiceNow_Server/sys_user_group_list.do?JSONv2" -WebSession $ServiceNow_Session
-$incidentGroups.records
-
-Get Users
-$incidentUsers = irm -Uri "https://$ServiceNow_Server/sys_user_list.do?JSONv2" -WebSession $ServiceNow_Session
-$incidentUsers.records
-
-#>
