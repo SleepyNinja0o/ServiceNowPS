@@ -2,6 +2,19 @@ Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
 $Global:ServiceNow_Server = "https://*****.service-now.com"
 $Global:ServiceNow_Lists = @{}
 
+$Global:ServiceNow_REST_Status_Codes = @{
+    200 = @{"Message" = "Success";"Details" = "Success with response body."}
+    201 = @{"Message" = "Created";"Details" = "Success with response body."}
+    204 = @{"Message" = "Success";"Details" = "Success with no response body."}
+    400 = @{"Message" = "Bad Request";"Details" = "The request URI does not match the APIs in the system, or the operation failed for unknown reasons. Invalid headers can also cause this error."}
+    401 = @{"Message" = "Unauthorized";"Details" = "The user is not authorized to use the API."}
+    403 = @{"Message" = "Forbidden";"Details" = "The requested operation is not permitted for the user. This error can also be caused by ACL failures, or business rule or data policy constraints."}
+    404 = @{"Message" = "Not Found";"Details" = "The requested resource was not found. This can be caused by an ACL constraint or if the resource does not exist."}
+    405 = @{"Message" = "Method not allowed";"Details" = "The HTTP action is not allowed for the requested REST API, or it is not supported by any API."}
+    406 = @{"Message" = "Not acceptable";"Details" = "The endpoint does not support the response format specified in the request Accept header."}
+    415 = @{"Message" = "Unsupported media type";"Details" = "The endpoint does not support the format of the request body."}
+}
+
 function Parse-String ($String,$StartStr,$EndStr){
     if($String.IndexOf($StartStr) -eq -1){return ""}
     $StartStrPos = $String.IndexOf($StartStr)+$StartStr.Length
