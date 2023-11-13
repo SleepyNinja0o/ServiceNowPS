@@ -1377,6 +1377,7 @@ Export-ModuleMember -Function Get-ServiceNowList
 #Export-ModuleMember -Function New-ServiceNowSCTask           #This functions needs additional review/recoding
 #Export-ModuleMember -Function New-ServiceNowSCTaskAdvanced   #This functions needs additional review/recoding
 Export-ModuleMember -Function New-ServiceNowSession
+Export-ModuleMember -Function New-ServiceNowWebRequest
 #Export-ModuleMember -Function Search-ServiceNowCustomer      #This functions needs additional review/recoding
 Export-ModuleMember -Function Update-ServiceNowCategories
 Export-ModuleMember -Function Update-ServiceNowGroups
