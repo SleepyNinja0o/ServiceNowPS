@@ -15,7 +15,6 @@ function Parse-String ($String,$StartStr,$EndStr){
     return ""
 }
 
-#CONVERTED to New-ServiceNowWebRequest
 function Add-ServiceNowAttachment{
 <#
 .SYNOPSIS
@@ -155,7 +154,6 @@ $File
     }
 }
 
-#CONVERTED to New-ServiceNowWebRequest
 function Close-ServiceNowIncident{
 param(
 $SysID,$TicketNum,$State,$CloseCode,$CloseNotes
@@ -187,7 +185,6 @@ function Close-ServiceNowSession{
     Remove-Variable -Name "ServiceNow_*", "SN_*" -Scope Global -ErrorAction SilentlyContinue
 }
 
-#CONVERTED to New-ServiceNowWebRequest
 function Confirm-ServiceNowSession{
     if($ServiceNow_Session){
         #$SN_User_Profile_Page_Refresh = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session).records
@@ -243,10 +240,10 @@ function Get-MimeType {
 }
 
 function Get-ServiceNowCategories {
-    $global:ServiceNowCATsFilePath = "$($PSScriptRoot)\ServiceNow_Categories.json"
+    $global:SN_CATsFilePath = "$($PSScriptRoot)\ServiceNow_Categories.json"
 
-    if(Test-Path $ServiceNowCATsFilePath){
-        $global:ServiceNow_Categories = (Get-Content $ServiceNowCATsFilePath -Raw) | ConvertFrom-Json
+    if(Test-Path $SN_CATsFilePath){
+        $global:ServiceNow_Categories = (Get-Content $SN_CATsFilePath -Raw) | ConvertFrom-Json
         Write-Host "ServiceNow Categories JSON file import successful!" -ForegroundColor Green
     }else{
         Write-Host "ServiceNow Categories JSON file not found!" -ForegroundColor Red
@@ -255,7 +252,7 @@ function Get-ServiceNowCategories {
 
         if($confirm.ToLower() -eq "y" -or $confirm.ToLower() -eq "yes"){
             Update-ServiceNowCategories
-            $global:ServiceNow_Categories = (Get-Content $ServiceNowCATsFilePath -Raw) | ConvertFrom-Json
+            $global:ServiceNow_Categories = (Get-Content $SN_CATsFilePath -Raw) | ConvertFrom-Json
             Write-Host "Service Now Categories hash table created successfully!" -ForegroundColor Green
         }else{
             return $null
@@ -264,10 +261,10 @@ function Get-ServiceNowCategories {
 }
 
 function Get-ServiceNowGroups {
-    $global:ServiceNowGroupsFilePath = "$($PSScriptRoot)\ServiceNow_Groups.json"
+    $global:SN_GroupsFilePath = "$($PSScriptRoot)\ServiceNow_Groups.json"
 
-    if(Test-Path $ServiceNowGroupsFilePath){
-        $global:ServiceNow_Groups = (Get-Content $ServiceNowGroupsFilePath -Raw) | ConvertFrom-Json
+    if(Test-Path $SN_GroupsFilePath){
+        $global:ServiceNow_Groups = (Get-Content $SN_GroupsFilePath -Raw) | ConvertFrom-Json
         Write-Host "ServiceNow Groups JSON file import successful!" -ForegroundColor Green
     }else{
         Write-Host "ServiceNow Groups JSON file not found!" -ForegroundColor Red
@@ -276,7 +273,7 @@ function Get-ServiceNowGroups {
 
         if($confirm.ToLower() -eq "y" -or $confirm.ToLower() -eq "yes"){
             Update-ServiceNowGroups
-            $global:ServiceNow_Groups = (Get-Content $ServiceNowGroupsFilePath -Raw) | ConvertFrom-Json
+            $global:ServiceNow_Groups = (Get-Content $SN_GroupsFilePath -Raw) | ConvertFrom-Json
             Write-Host "Service Now Groups array created successfully!" -ForegroundColor Green
         }else{
             return $null
@@ -284,7 +281,6 @@ function Get-ServiceNowGroups {
     }
 }
 
-#CONVERTED to New-ServiceNowWebRequest
 function Get-ServiceNowList{
 <#
 .SYNOPSIS
@@ -306,7 +302,6 @@ $Name
     }
 }
 
-#CONVERTED to New-ServiceNowWebRequest
 function Get-ServiceNowRecord{
 param(
 [Parameter(Mandatory)]
@@ -479,8 +474,7 @@ function Get-ServiceNowServices {
     }
 }
 
-#CONVERTED to New-ServiceNowWebRequest
-#ALSO Needs cleaned up
+#Needs cleaned up
 function New-ServiceNowIncident{
 param(
 [Parameter(Mandatory)]
@@ -631,8 +625,7 @@ $File="",
     }
 }
 
-#CONVERTED to New-ServiceNowWebRequest
-#ALSO Needs cleaned up
+#Needs cleaned up
 function New-ServiceNowIncidentAdvanced{
 <#
 .SYNOPSIS
@@ -859,7 +852,6 @@ $File="",
     }
 }
 
-#SKIPPING New-ServiceNowWebRequest Conversion for now...
 function New-ServiceNowSession{
 param(
     $Server,
@@ -1060,7 +1052,6 @@ param(
     }
 }
 
-#CONVERTED to New-ServiceNowWebRequest
 function New-SNSessionRefresher{
     $global:ServiceNow_Session_Timer = New-Object System.Timers.Timer
 
@@ -1086,7 +1077,6 @@ function New-SNSessionRefresher{
     $ServiceNow_Session_Timer.Enabled = $True
 }
 
-#CONVERTED to New-ServiceNowWebRequest
 function Search-ServiceNowCustomer{
 param($Name,$Fields)
     if($Fields -ne "" -and $Fields -ne $null){
@@ -1098,14 +1088,13 @@ param($Name,$Fields)
     return (New-ServiceNowWebRequest -Endpoint "/xmlhttp.do" -Method Post -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=Reference&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=incident.caller_id&sysparm_max=15&sysparm_chars=$Name&ac_columns=$Fields&ac_order_by=name" -REST).xml.ChildNodes
 }
 
-#SKIPPING New-ServiceNowWebRequest Conversion for now...
-#Need code review - CAN BE IMPROVED
 function Update-ServiceNowCategories {
-    Confirm-ServiceNowSession
-
-    $global:ServiceNowCATsFilePath = "$($PSScriptRoot)\ServiceNow_Categories.json"
+    $global:SN_CATsFilePath = "$($PSScriptRoot)\ServiceNow_Categories.json"
     $i = 0
-    $CategoryListHash = [ordered]@{}
+    $SN_CategoryListHash = [ordered]@{}
+    
+    $SN_CategoryList = Get-ServiceNowList -Name "incident.category"
+    <#
     $CategoryList = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" `
     -Method "POST" `
     -WebSession $ServiceNow_Session `
@@ -1114,11 +1103,15 @@ function Update-ServiceNowCategories {
     } `
     -ContentType "application/x-www-form-urlencoded; charset=UTF-8" `
     -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=incident.category&sysparm_chars=*&sysparm_nomax=true").xml[1].ChildNodes.Name
+    #>
 
-    foreach($Cat in $CategoryList){
+    foreach($Cat in $SN_CategoryList){
         if($i%5 -eq 0){
             Write-Host "$([int](($i/88)*100))%.." -NoNewline
         }
+
+        $wr = New-ServiceNowWebRequest -Endpoint "/xmlhttp.do" -Method Post -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_value=$cat&sysparm_name=incident.subcategory&sysparm_chars=*&sysparm_nomax=true" -REST
+        <#
         $wr = Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" `
         -Method "POST" `
         -WebSession $ServiceNow_Session `
@@ -1127,26 +1120,23 @@ function Update-ServiceNowCategories {
         } `
         -ContentType "application/x-www-form-urlencoded; charset=UTF-8" `
         -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_value=$cat&sysparm_name=incident.subcategory&sysparm_chars=*&sysparm_nomax=true"
+        #>
 
-        $CategoryListHash[$Cat] = $wr.xml[1].ChildNodes.name
+        $SN_CategoryListHash[$Cat] = $wr.xml[1].ChildNodes.name
         $i++
     }
     Write-Host "100%..Download Complete! Saving to file..."
-    $CategoryListHash.GetEnumerator() | ConvertTo-Json | Out-File $ServiceNowCATsFilePath -Verbose
+    $SN_CategoryListHash.GetEnumerator() | ConvertTo-Json | Out-File $SN_CATsFilePath -Verbose
     Write-Host "`nService Now Categories JSON file updated successfully!" -ForegroundColor Green
 }
 
-#SKIPPING New-ServiceNowWebRequest Conversion for now...
-#Need code review - CAN BE IMPROVED
 function Update-ServiceNowGroups {
-    Confirm-ServiceNowSession
-
-    $global:ServiceNowGroupsFilePath = "$($PSScriptRoot)\ServiceNow_Groups.json"
-    (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user_group_list.do?JSONv2" -WebSession $ServiceNow_Session).records | where {$_.name -ne "" -and $_.name -ne $null} | select name,sys_id,manager | sort name | ConvertTo-Json | Out-File $ServiceNowGroupsFilePath -Force
+    $global:SN_GroupsFilePath = "$($PSScriptRoot)\ServiceNow_Groups.json"
+    #(Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user_group_list.do?JSONv2" -WebSession $ServiceNow_Session).records | where {$_.name -ne "" -and $_.name -ne $null} | select name,sys_id,manager | sort name | ConvertTo-Json | Out-File $SN_GroupsFilePath -Force
+    (New-ServiceNowWebRequest -Endpoint "/sys_user_group_list.do?JSONv2" -REST).records  | where {$_.name -ne "" -and $_.name -ne $null} | select name,sys_id,manager | sort name | ConvertTo-Json | Out-File $SN_GroupsFilePath -Force
     Write-Host "Service Now Groups JSON file updated successfully!" -ForegroundColor Green
 }
 
-#CONVERTED to New-ServiceNowWebRequest
 function Update-ServiceNowRecord{
 <#
 .SYNOPSIS
@@ -1218,13 +1208,10 @@ $BodyParams
     }
 }
 
-#SKIPPING New-ServiceNowWebRequest Conversion for now...
-#Need code review - CAN BE IMPROVED
 function Update-ServiceNowServices {
-    Confirm-ServiceNowSession
-
     $global:ServiceNowServicesFilePath = "$($PSScriptRoot)\ServiceNow_Services.json"
-    $ServiceNow_Services = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/cmdb_ci_service_list.do?JSONv2&sysparm_target=incident.business_service" -WebSession $ServiceNow_Session -Headers @{"X-UserToken"=$SN_User_Token}).records | where {$_.name -ne "" -and $_.name -ne $null} | select name,sys_id | sort name | ConvertTo-Json | Out-File $ServiceNowServicesFilePath -Force
+    $ServiceNow_Services = (New-ServiceNowWebRequest -Endpoint "/cmdb_ci_service_list.do?JSONv2&sysparm_target=incident.business_service" -REST).records | where {$_.name -ne "" -and $_.name -ne $null} | select name,sys_id | sort name | ConvertTo-Json | Out-File $ServiceNowServicesFilePath -Force
+    #$ServiceNow_Services = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/cmdb_ci_service_list.do?JSONv2&sysparm_target=incident.business_service" -WebSession $ServiceNow_Session -Headers @{"X-UserToken"=$SN_User_Token}).records | where {$_.name -ne "" -and $_.name -ne $null} | select name,sys_id | sort name | ConvertTo-Json | Out-File $ServiceNowServicesFilePath -Force
     Write-Host "Service Now Services JSON file updated successfully!" -ForegroundColor Green
 }
 
