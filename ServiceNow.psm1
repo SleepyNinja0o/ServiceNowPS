@@ -817,7 +817,7 @@ $File="",
             $ReAuthTried = $False
             while($True){
                 try{
-                    $Submit_SCTask = Invoke-WebRequest -Uri "https://$ServiceNow_Server/api/sn_sc/v1/servicecatalog/items/5d167fd96ce4fc1004ed764f2fe89f42/order_now" -Method "POST" -ContentType "application/json" -Body $($SN_Ticket_Body | ConvertTo-Json) -WebSession $ServiceNow_Session -Headers $headers -ErrorVariable Submit_SCTask_Error
+                    $Submit_SCTask = Invoke-WebRequest -UseBasicParsing -Uri "https://$ServiceNow_Server/api/sn_sc/v1/servicecatalog/items/5d167fd96ce4fc1004ed764f2fe89f42/order_now" -Method "POST" -ContentType "application/json" -Body $($SN_Ticket_Body | ConvertTo-Json) -WebSession $ServiceNow_Session -Headers $headers -ErrorVariable Submit_SCTask_Error
                     break
                 }catch{
                     if($ReAuthTried){
@@ -843,7 +843,7 @@ $File="",
                 $RequestSysID = $Submit_SCTask_2.sys_id
 
                 #-----Query 'SC_Task' for a record that contains a 'Request' with SysID from above-----
-                $SCTaskQuery = Invoke-RestMethod -Uri "https://$ServiceNow_Server/sc_task.do?JSONv2&sysparm_query=request=$RequestSysID" -WebSession $ServiceNow_Session
+                $SCTaskQuery = Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/sc_task.do?JSONv2&sysparm_query=request=$RequestSysID" -WebSession $ServiceNow_Session
                 $global:SCTask_SysID = $SCTaskQuery.records[0].sys_id
                 $global:SCTask_Number = $SCTaskQuery.records[0].number
 
@@ -888,7 +888,7 @@ param(
 
     Write-Host "Connecting to $ServiceNow_Server..." -ForegroundColor Yellow
     try{
-        $SN_Login_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server" -SessionVariable global:ServiceNow_Session -ErrorAction Stop
+        $SN_Login_Page = Invoke-WebRequest -UseBasicParsing -Uri "https://$ServiceNow_Server" -SessionVariable global:ServiceNow_Session -ErrorAction Stop
         if($SN_Login_Page.StatusCode -ne 200){
             Write-Host "Connection to ServiceNow failed!`nStatus Code: $($SN_Login_Page.StatusCode)"
             return
@@ -902,7 +902,7 @@ param(
     
     try{
         if($Username -and $Pass){
-            $SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/login.do" -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body @{
+            $SN_Banner_Page = Invoke-WebRequest -UseBasicParsing -Uri "https://$ServiceNow_Server/login.do" -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body @{
                 "sysparm_ck" = $SN_GCK_Token
                 "user_name" = $Username
                 "user_password" = $Pass
@@ -953,7 +953,7 @@ param(
 
             #Retrieve Smart Card certificate and login to EAMS
             $global:SN_Cert = Get-AuthCertificate
-            $EAMS_Login = Invoke-WebRequest -Uri "https://federation.eams.army.mil/pool/sso/saml/authenticate?request_client_cert=true" -WebSession $ServiceNow_Session -Certificate $SN_Cert -Method Post -ContentType "application/x-www-form-urlencoded" -Body $EAMS_Auth_Request -Verbose
+            $EAMS_Login = Invoke-WebRequest -UseBasicParsing -Uri "https://federation.eams.army.mil/pool/sso/saml/authenticate?request_client_cert=true" -WebSession $ServiceNow_Session -Certificate $SN_Cert -Method Post -ContentType "application/x-www-form-urlencoded" -Body $EAMS_Auth_Request -Verbose
             $Global:EAMS_Login_Redirect_URL = $EAMS_Login.BaseResponse.ResponseUri.AbsoluteUri
             #Write-Host "EAMS Redirect URL: $EAMS_Login_Redirect_URL`n"
 
@@ -978,7 +978,7 @@ param(
             $SN_Banner_Page = Invoke-WebRequest -UseBasicParsing -Uri $AESMP_Login_Redirect_URL -WebSession $ServiceNow_Session
         }elseif($CertificateAuth.IsPresent){
             $global:SN_Cert = Get-AuthCertificate
-            $SN_Banner_Page = Invoke-WebRequest -Uri "https://$ServiceNow_Server/login.do" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -WebSession $ServiceNow_Session
+            $SN_Banner_Page = Invoke-WebRequest -UseBasicParsing -Uri "https://$ServiceNow_Server/login.do" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -WebSession $ServiceNow_Session
         }else{
             Write-Host "ServiceNow session was not created. Session type was not specified." -ForegroundColor Red
             return
@@ -1007,7 +1007,7 @@ param(
     if ($SN_Banner_Page.Content -match "g_ck = '(.*)'") {$global:SN_User_Token = $matches[1];write-host "Found User Token: $($SN_User_Token.Substring(0,10))....`n" -ForegroundColor Green}
 
     $ServiceNow_Session.Headers.Add("X-UserToken",$SN_User_Token)
-    $global:SN_User_Profile_Page = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session -ErrorAction Stop).records
+    $global:SN_User_Profile_Page = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session -ErrorAction Stop).records
 
     $global:SN_DisplayName = $SN_User_Profile_Page.name
     $global:SN_UserName = $SN_User_Profile_Page.user_name
