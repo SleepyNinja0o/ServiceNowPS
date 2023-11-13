@@ -1280,6 +1280,19 @@ function Update-ServiceNowGroups {
 
 #CONVERTED to New-ServiceNowWebRequest
 function Update-ServiceNowRecord{
+<#
+.SYNOPSIS
+Updates a single or multiple fields for a record in ServiceNow.
+
+.EXAMPLE
+$BodyParams = @{
+"state" = "Resolved"
+"close_code"="Duplicate"
+"close_notes"="This incident is a duplicate of INC1234567"
+}
+
+$Update_SN_record = Update-ServiceNowRecord -RecordType "Incident" -TicketNum "INC8675309" -BodyParams $BodyParams
+#>
 param(
 [Parameter(Mandatory)]
 [ValidateSet("ChangeRequest","ChangeTask","CustomerServiceCase","Group","Incident","Request","RequestItem","ScheduledTask","User","ConfigurationItem")]
@@ -1367,4 +1380,5 @@ Export-ModuleMember -Function New-ServiceNowSession
 #Export-ModuleMember -Function Search-ServiceNowCustomer      #This functions needs additional review/recoding
 Export-ModuleMember -Function Update-ServiceNowCategories
 Export-ModuleMember -Function Update-ServiceNowGroups
+Export-ModuleMember -Function Update-ServiceNowRecord
 Export-ModuleMember -Function Update-ServiceNowServices
