@@ -1086,8 +1086,7 @@ function New-SNSessionRefresher{
     $ServiceNow_Session_Timer.Enabled = $True
 }
 
-#SKIPPING New-ServiceNowWebRequest Conversion for now...
-#Need code review
+#CONVERTED to New-ServiceNowWebRequest
 function Search-ServiceNowCustomer{
 param($Name,$Fields)
     if($Fields -ne "" -and $Fields -ne $null){
@@ -1097,12 +1096,6 @@ param($Name,$Fields)
     }
 
     return (New-ServiceNowWebRequest -Endpoint "/xmlhttp.do" -Method Post -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=Reference&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=incident.caller_id&sysparm_max=15&sysparm_chars=$Name&ac_columns=$Fields&ac_order_by=name" -REST).xml.ChildNodes
-
-    #return (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" `
-    #-Method "POST" `
-    #-WebSession $ServiceNow_Session `
-    #-ContentType "application/x-www-form-urlencoded; charset=UTF-8" `
-    #-Body "sysparm_processor=Reference&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=incident.caller_id&sysparm_max=15&sysparm_chars=$Name&ac_columns=$Fields&ac_order_by=name").xml.ChildNodes
 }
 
 #SKIPPING New-ServiceNowWebRequest Conversion for now...
