@@ -1086,12 +1086,20 @@ function New-SNSessionRefresher{
 #SKIPPING New-ServiceNowWebRequest Conversion for now...
 #Need code review
 function Search-ServiceNowCustomer{
-param($Name)
-    return (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" `
-    -Method "POST" `
-    -WebSession $ServiceNow_Session `
-    -ContentType "application/x-www-form-urlencoded; charset=UTF-8" `
-    -Body "sysparm_processor=Reference&sysparm_scope=global&sysparm_want_session_messages=true&ni.nolog.x_referer=ignore&sysparm_name=incident.caller_id&sysparm_max=15&sysparm_chars=$Name&sysparm_value=&ac_columns=user_name;u_district;email&ac_order_by=name").xml.ChildNodes
+param($Name,$Fields)
+    if($Fields -ne "" -and $Fields -ne $null){
+        $ReturnFields = $Fields
+    }else{
+        $ReturnFields = "first_name;last_name;user_name;email"    
+    }
+
+    return (New-ServiceNowWebRequest -Endpoint "/xmlhttp.do" -Method Post -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=Reference&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=incident.caller_id&sysparm_max=15&sysparm_chars=$Name&ac_columns=$Fields&ac_order_by=name" -REST).xml.ChildNodes
+
+    #return (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" `
+    #-Method "POST" `
+    #-WebSession $ServiceNow_Session `
+    #-ContentType "application/x-www-form-urlencoded; charset=UTF-8" `
+    #-Body "sysparm_processor=Reference&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=incident.caller_id&sysparm_max=15&sysparm_chars=$Name&ac_columns=$Fields&ac_order_by=name").xml.ChildNodes
 }
 
 #SKIPPING New-ServiceNowWebRequest Conversion for now...
@@ -1239,10 +1247,9 @@ Export-ModuleMember -Function New-ServiceNowIncident
 Export-ModuleMember -Function New-ServiceNowIncidentAdvanced
 Export-ModuleMember -Function Get-ServiceNowList
 #Export-ModuleMember -Function New-ServiceNowSCTask           #This functions needs additional review/recoding
-#Export-ModuleMember -Function New-ServiceNowSCTaskAdvanced   #This functions needs additional review/recoding
 Export-ModuleMember -Function New-ServiceNowSession
 Export-ModuleMember -Function New-ServiceNowWebRequest
-#Export-ModuleMember -Function Search-ServiceNowCustomer      #This functions needs additional review/recoding
+Export-ModuleMember -Function Search-ServiceNowCustomer
 Export-ModuleMember -Function Update-ServiceNowCategories
 Export-ModuleMember -Function Update-ServiceNowGroups
 Export-ModuleMember -Function Update-ServiceNowRecord
