@@ -1278,6 +1278,65 @@ function Update-ServiceNowGroups {
     Write-Host "Service Now Groups JSON file updated successfully!" -ForegroundColor Green
 }
 
+#CONVERTED to New-ServiceNowWebRequest
+function Update-ServiceNowRecord{
+param(
+[Parameter(Mandatory)]
+[ValidateSet("ChangeRequest","ChangeTask","CustomerServiceCase","Group","Incident","Request","RequestItem","ScheduledTask","User","ConfigurationItem")]
+$RecordType,
+$SysID,
+$TicketNum,
+[Parameter(Mandatory)]
+$BodyParams
+)
+    if (!$ServiceNow_Session){Confirm-ServiceNowSession}
+
+    if($TicketNum -ne "" -and $TicketNum -ne $null){$SysID = (Get-ServiceNowRecord -RecordType Incident -TicketNumber $TicketNum).sys_id}
+
+    if($SysID -eq "" -or $SysID -eq $null){Write-Host "Missing record SysID! Please provide and try again!" -ForegroundColor Red;return}
+
+    if($BodyParams.GetType().Name -eq "Hashtable"){$BodyParams = $BodyParams | ConvertTo-Json -Compress}
+
+    switch ($RecordType.toLower()){
+        "user" {
+            $RecordTypeURL = "sys_user_list.do"
+        }
+        "group" {
+            $RecordTypeURL = "sys_user_group_list.do"
+        }
+        "scheduledtask" {
+            $RecordTypeURL = "sc_task_list.do"
+        }
+        "changerequest" {
+            $RecordTypeURL = "change_request_list.do"
+        }
+        "changetask" {
+            $RecordTypeURL = "change_task_list.do"
+        }
+        "incident" {
+            $RecordTypeURL = "incident_list.do"
+        }
+        "request" {
+            $RecordTypeURL = "sc_request_list.do"
+        }
+        "requestitem" {
+            $RecordTypeURL = "sc_req_item_list.do"
+        }
+        "configurationitem" {
+            $RecordTypeURL = "cmdb_ci_pc_hardware.do"
+        }
+        "customerservicecase" {
+            $RecordTypeURL = "sn_customerservice_case_list.do"
+        }
+    }
+    if($RecordTypeURL -ne "" -and $RecordTypeURL -ne $null){
+        return (New-ServiceNowWebRequest -Endpoint "/$RecordTypeURL?JSONv2&sysparm_sys_id=$SysID&sysparm_action=update" -Method Post -ContentType "application/json" -Body $BodyParams -REST).records
+    }else{
+        Write-Host "Record Type was not found in switch statement. Exiting function..." -ForegroundColor Red
+        return
+    }
+}
+
 #SKIPPING New-ServiceNowWebRequest Conversion for now...
 #Need code review - CAN BE IMPROVED
 function Update-ServiceNowServices {
