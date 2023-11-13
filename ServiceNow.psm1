@@ -671,15 +671,10 @@ $INC_Body = [ordered]@{
 New-ServiceNowIncidentAdvanced -SN_Ticket_Body $INC_Body
 #>
 param(
-[Hashtable]$SN_Ticket_Body,
+$SN_Ticket_Body,
 [String]$File="",
 [switch]$SkipVerification
 )
-    #$SN_Ticket_Headers = @{
-    #    'Accept' = "application/json"
-    #    'X-UserToken' = $SN_User_Token
-    #}
-
     Write-Host "`n*** Incident Details Overview ***" -ForegroundColor Yellow
     Write-Host "$(($SN_Ticket_Body | ft -HideTableHeaders -AutoSize -Wrap | Out-String).Trim())`n" -ForegroundColor Cyan
 
@@ -690,44 +685,20 @@ param(
     }
 
     if($confirm.ToLower() -eq "y"){
-        <#
-        $RetryCount = 0
-        $ReAuthTried = $False
-        while($True){
-            try{
-                $Submit_INC = Invoke-WebRequest -Uri "https://$ServiceNow_Server/incident.do?JSONv2&sysparm_action=insert" -Method "POST" -ContentType "application/json" -Headers $SN_Ticket_Headers -Body $($SN_Ticket_Body | ConvertTo-Json) -WebSession $ServiceNow_Session
-                break
-            }catch{
-                if($ReAuthTried){
-                    Write-Host "Failed to submit ticket after verifying session, skipping!" -ForegroundColor Red
-                    $ReAuthTried = $False
-                    return
-                }
-                Write-Host "Error occured while submitting ticket request to SNOW! Retrying!"
-                if($RetryCount -eq 3){
-                    if(!$ReAuthTried){
-                        Write-Host "Failed to submit ticket 3 times in a row...Verifying Session!" -ForegroundColor Red
-                        Confirm-ServiceNowSession
-                        $ReAuthTried = $True
-                    }
-                }
-                $RetryCount += 1
-            }
+        $SN_Ticket_Body = ($SN_Ticket_Body | ConvertTo-Json -Compress)
+        $Global:INC_Submit = New-ServiceNowWebRequest -Endpoint "/incident.do?JSONv2&sysparm_action=insert" -Method Post -ContentType "application/json" -Body $SN_Ticket_Body -REST
+        if(-not ($INC_Submit | Get-Member -Name records)){
+            Write-Host "Error occured during web request! Exiting function!" -ForegroundColor Red
+            return $INC_Submit
         }
-        #>
-        $SN_Ticket_Body = $SN_Ticket_Body | ConvertTo-Json
-        New-ServiceNowWebRequest -Endpoint "/incident.do?JSONv2&sysparm_action=insert" -Method Post -ContentType "application/json" -Body $SN_Ticket_Body
-        $Submit_INC_2 = ($Submit_INC.Content | ConvertFrom-JSON).records[0]
-        if (($Submit_INC.StatusCode -eq "200")) {
-            $Global:INC_Number = $Submit_INC_2.number
-            $Global:INC_SysID = $Submit_INC_2.sys_id
-            Write-Host "*** Successfully Submitted `"$INC_Number`" to ServiceNow ***`n" -ForegroundColor Green
-            if($File -ne ""){
+        $Global:INC_Number = $INC_Submit.records[0].number
+        $Global:INC_SysID = $INC_Submit.records[0].sys_id
+        Write-Host "*** Successfully Submitted `"$INC_Number`" to ServiceNow ***`n" -ForegroundColor Green
+        if($File -ne ""){
                 Write-Host "Uploading file ($File) to $INC_Number..." -ForegroundColor Yellow
                 Add-ServiceNowAttachment -TicketType 'incident' -TicketSysID $INC_SysID -File $File
             }
-            return "$INC_Number,$INC_SysID"
-        }
+        return $INC_Submit.records
     }else{
         Write-Host "Aborting Ticket Creation!`n" -ForegroundColor Red
     }
@@ -1343,7 +1314,7 @@ $BodyParams
         }
     }
     if($RecordTypeURL -ne "" -and $RecordTypeURL -ne $null){
-        return (New-ServiceNowWebRequest -Endpoint "/$RecordTypeURL?JSONv2&sysparm_sys_id=$SysID&sysparm_action=update" -Method Post -ContentType "application/json" -Body $BodyParams -REST).records
+        return (New-ServiceNowWebRequest -Endpoint "/$($RecordTypeURL)?JSONv2&sysparm_sys_id=$($SysID)&sysparm_action=update" -Method Post -ContentType "application/json" -Body $BodyParams -REST).records
     }else{
         Write-Host "Record Type was not found in switch statement. Exiting function..." -ForegroundColor Red
         return
