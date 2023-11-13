@@ -901,18 +901,7 @@ param(
     if ($SN_Login_Page.Content -match "g_ck = '(.*)'") {$SN_GCK_Token = $matches[1];write-host "Found G_CK Token: $($SN_GCK_Token.Substring(0,10))...." -ForegroundColor Green}
     
     try{
-        if($Username -and $Pass){
-            $SN_Banner_Page = Invoke-WebRequest -UseBasicParsing -Uri "https://$ServiceNow_Server/login.do" -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body @{
-                "sysparm_ck" = $SN_GCK_Token
-                "user_name" = $Username
-                "user_password" = $Pass
-                "not_important"=$null
-                "ni.nolog.user_password" = $true
-                "ni.noecho.user_name" = $true
-                "ni.noecho.user_password" = $true
-                "sys_action" = "sysverb_login"
-                "sysparm_login_url" = "welcome.do"} -WebSession $ServiceNow_Session
-        }elseif($ServiceNow_Server -match "aesmp\.army\.mil"){
+        if($ServiceNow_Server -match "aesmp\.army\.mil"){
             #Create AESMP web session
             $AESMP_MainPage = Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server" -SessionVariable global:ServiceNow_Session -Verbose
             $Portal_ID = Parse-String -String $AESMP_MainPage -StartStr "ng-init=`"portal_id = '" -EndStr "'"
@@ -976,9 +965,20 @@ param(
             $AESMP_Login = Invoke-WebRequest -UseBasicParsing -Uri "https://$ServiceNow_Server/navpage.do" -WebSession $ServiceNow_Session -Method Post -ContentType "application/x-www-form-urlencoded" -Body $AESMP_Auth_Request
             $AESMP_Login_Redirect_URL = $AESMP_Login.BaseResponse.ResponseUri.AbsoluteUri
             $SN_Banner_Page = Invoke-WebRequest -UseBasicParsing -Uri $AESMP_Login_Redirect_URL -WebSession $ServiceNow_Session
+        }elseif($Username -and $Pass){
+            $SN_Banner_Page = Invoke-WebRequest -UseBasicParsing -Uri "https://$ServiceNow_Server/login.do" -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body @{
+                "sysparm_ck" = $SN_GCK_Token
+                "user_name" = $Username
+                "user_password" = $Pass
+                "not_important"=$null
+                "ni.nolog.user_password" = $true
+                "ni.noecho.user_name" = $true
+                "ni.noecho.user_password" = $true
+                "sys_action" = "sysverb_login"
+                "sysparm_login_url" = "welcome.do"} -WebSession $ServiceNow_Session
         }elseif($CertificateAuth.IsPresent){
             $global:SN_Cert = Get-AuthCertificate
-            $SN_Banner_Page = Invoke-WebRequest -UseBasicParsing -Uri "https://$ServiceNow_Server/login.do" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -WebSession $ServiceNow_Session
+            $SN_Banner_Page = Invoke-WebRequest -UseBasicParsing -Uri "https://$ServiceNow_Server/my.policy" -Certificate $SN_Cert -Method "POST" -ContentType "application/x-www-form-urlencoded" -Body "choice=1" -WebSession $ServiceNow_Session
         }else{
             Write-Host "ServiceNow session was not created. Session type was not specified." -ForegroundColor Red
             return
