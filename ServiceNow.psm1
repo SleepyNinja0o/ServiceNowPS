@@ -1122,6 +1122,67 @@ param($Name,$Fields)
     return (New-ServiceNowWebRequest -Endpoint "/xmlhttp.do" -Method Post -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=Reference&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=incident.caller_id&sysparm_max=15&sysparm_chars=$Name&ac_columns=$Fields&ac_order_by=name" -REST).xml.ChildNodes
 }
 
+function Search-ServiceNowRecords{
+<#
+.SYNOPSIS
+Executes a query for records in ServiceNow.
+
+.EXAMPLE
+$Search_SN_Record = Search-ServiceNowRecords -RecordType "User" -Query "first_name=Abel^last_name=Smith"
+#>
+param(
+[Parameter(Mandatory)]
+[ValidateSet("ChangeRequest","ChangeTask","CustomerServiceCase","Group","Incident","Request","RequestItem","ScheduledTask","User","ConfigurationItem")]
+$RecordType,
+[Parameter(Mandatory)]
+$Query
+)
+    switch ($RecordType.toLower()){
+        "user" {
+            $RecordTypeURL = "sys_user_list.do"
+        }
+        "group" {
+            $RecordTypeURL = "sys_user_group_list.do"
+        }
+        "scheduledtask" {
+            $RecordTypeURL = "sc_task_list.do"
+        }
+        "changerequest" {
+            $RecordTypeURL = "change_request_list.do"
+        }
+        "changetask" {
+            $RecordTypeURL = "change_task_list.do"
+        }
+        "incident" {
+            $RecordTypeURL = "incident_list.do"
+        }
+        "request" {
+            $RecordTypeURL = "sc_request_list.do"
+        }
+        "requestitem" {
+            $RecordTypeURL = "sc_req_item_list.do"
+        }
+        "configurationitem" {
+            $RecordTypeURL = "cmdb_ci_pc_hardware_list.do"
+        }
+        "customerservicecase" {
+            $RecordTypeURL = "sn_customerservice_case_list.do"
+        }
+    }
+    if($RecordTypeURL -ne "" -and $RecordTypeURL -ne $null){
+        $SN_WR = New-ServiceNowWebRequest -Endpoint "/$($RecordTypeURL)?JSONv2&sysparm_query=$Query" -REST
+        if(-not ($SN_WR | Get-Member -Name records)){
+            Write-Host "Error occured during web request! Exiting function!" -ForegroundColor Red
+            return $INC_Submit
+        }else{
+            return $SN_WR.records
+        }
+    }else{
+        Write-Host "Record Type was not found in switch statement. Exiting function..." -ForegroundColor Red
+        return
+    }
+}
+
 function Update-ServiceNowCategories {
     $global:SN_CATsFilePath = "$($PSScriptRoot)\ServiceNow_Categories.json"
     $i = 0
