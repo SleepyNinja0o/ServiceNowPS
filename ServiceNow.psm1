@@ -1122,7 +1122,7 @@ param($Name,$Fields)
     return (New-ServiceNowWebRequest -Endpoint "/xmlhttp.do" -Method Post -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=Reference&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=incident.caller_id&sysparm_max=15&sysparm_chars=$Name&ac_columns=$Fields&ac_order_by=name" -REST).xml.ChildNodes
 }
 
-function Search-ServiceNowRecords{
+function Search-ServiceNowRecord{
 <#
 .SYNOPSIS
 Executes a query for records in ServiceNow.
@@ -1327,6 +1327,7 @@ Export-ModuleMember -Function Get-ServiceNowList
 Export-ModuleMember -Function New-ServiceNowSession
 Export-ModuleMember -Function New-ServiceNowWebRequest
 Export-ModuleMember -Function Search-ServiceNowCustomer
+Export-ModuleMember -Function Search-ServiceNowRecord
 Export-ModuleMember -Function Update-ServiceNowCategories
 Export-ModuleMember -Function Update-ServiceNowGroups
 Export-ModuleMember -Function Update-ServiceNowRecord
