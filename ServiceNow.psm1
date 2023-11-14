@@ -69,8 +69,6 @@ $TicketNumber,
 $TicketSysID,
 $File
 )
-    if (!$ServiceNow_Session){Confirm-ServiceNowSession}
-
     if($TicketNumber){
         switch($TicketType){
             "sc_task" {
@@ -329,8 +327,6 @@ $GroupNameSearch,
 $TicketNumber,
 $TicketSearch
 )
-    if (!$ServiceNow_Session){Confirm-ServiceNowSession}
-
     switch ($RecordType.toLower()){
         "user" {
             $RecordTypeURL = "sys_user_list.do"
@@ -484,6 +480,31 @@ function Get-ServiceNowServices {
         }else{
             return $null
         }
+    }
+}
+
+function Get-ServiceNowUserUnique{
+param($FirstName,$LastName)
+    $UserSearch = Get-ServiceNowRecord -RecordType User -FirstName $FirstName -LastName $LastName
+    if($UserSearch.Count -ne 1){
+        while($True){
+            Write-Host "`nMultiple ServiceNow users found:" -ForegroundColor Cyan
+            $i=0
+            foreach($User in $UserSearch){
+                Write-Host "$i - $($User.name)"
+                $i++
+            }
+            Write-Host "`nPlease select a user: " -NoNewline -ForegroundColor Cyan
+            try{
+                $resp = [int](Read-Host)
+                return $UserSearch[$resp]
+            }catch{
+                Write-Host "Invalid response. Try again!`n" -ForegroundColor Red
+                continue
+            }
+        }
+    }else{
+        return $UserSearch[0]
     }
 }
 
@@ -1173,8 +1194,6 @@ $TicketNum,
 [Parameter(Mandatory)]
 $BodyParams
 )
-    if (!$ServiceNow_Session){Confirm-ServiceNowSession}
-
     if($TicketNum -ne "" -and $TicketNum -ne $null){$SysID = (Get-ServiceNowRecord -RecordType Incident -TicketNumber $TicketNum).sys_id}
 
     if($SysID -eq "" -or $SysID -eq $null){Write-Host "Missing record SysID! Please provide and try again!" -ForegroundColor Red;return}
@@ -1239,6 +1258,7 @@ Export-ModuleMember -Function Get-ServiceNowCategories
 Export-ModuleMember -Function Get-ServiceNowGroups
 Export-ModuleMember -Function Get-ServiceNowRecord
 Export-ModuleMember -Function Get-ServiceNowServices
+Export-ModuleMember -Function Get-ServiceNowUserUnique
 Export-ModuleMember -Function New-ServiceNowIncident
 Export-ModuleMember -Function New-ServiceNowIncidentAdvanced
 Export-ModuleMember -Function Get-ServiceNowList
