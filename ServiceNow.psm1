@@ -1260,6 +1260,7 @@ function Update-ServiceNowRecord{
 Updates a single or multiple fields for a record in ServiceNow.
 
 .EXAMPLE
+#Example 1: Create body paramters to update and pass to Update-ServiceNowRecord command.
 $BodyParams = @{
 "state" = "Resolved"
 "close_code"="Duplicate"
