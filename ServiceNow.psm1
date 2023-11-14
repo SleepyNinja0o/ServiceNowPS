@@ -483,6 +483,28 @@ function Get-ServiceNowServices {
     }
 }
 
+function Get-ServiceNowStats {
+    $SN_Stats_MasterStr = "*****Instance Information*****`n"
+    $SN_Stats = New-ServiceNowWebRequest -Endpoint "/stats.do" -REST
+    $StartPos = $SN_Stats.IndexOf("<br/>")
+    $LastPos = $SN_Stats.LastIndexOf("<br/>")
+    while($StartPos -lt $LastPos){
+        $ParseStr = (Parse-String $SN_Stats.Substring($StartPos) "<br/>" "<")
+
+        if($ParseStr -match ":"){
+            $SN_Stats_MasterStr += $ParseStr + "`n"
+        }
+
+        $NextStrong = $SN_Stats.IndexOf("<strong>",$StartPos+5)
+        $StartPos = $SN_Stats.IndexOf("<br/>",$StartPos+5)
+        if($NextStrong -lt $StartPos -and $NextStrong -ne -1){
+            $SN_Stats_MasterStr += "`n"
+            $SN_Stats_MasterStr += "*****" + (Parse-String $SN_Stats.Substring($NextStrong) "<strong>" "</strong>") + "*****" + "`n"
+        }
+    }
+    return $SN_Stats_MasterStr
+}
+
 function Get-ServiceNowUserUnique{
 param($FirstName,$LastName)
     $UserSearch = Get-ServiceNowRecord -RecordType User -FirstName $FirstName -LastName $LastName
@@ -1319,6 +1341,7 @@ Export-ModuleMember -Function Get-ServiceNowCategories
 Export-ModuleMember -Function Get-ServiceNowGroups
 Export-ModuleMember -Function Get-ServiceNowRecord
 Export-ModuleMember -Function Get-ServiceNowServices
+Export-ModuleMember -Function Get-ServiceNowStats
 Export-ModuleMember -Function Get-ServiceNowUserUnique
 Export-ModuleMember -Function New-ServiceNowIncident
 Export-ModuleMember -Function New-ServiceNowIncidentAdvanced
