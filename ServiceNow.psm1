@@ -954,9 +954,11 @@ param(
             Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/csm?id=landing" -WebSession $ServiceNow_Session | Out-Null
             $AESMP_LandingPage = (Invoke-WebRequest -UseBasicParsing -Uri "https://$ServiceNow_Server/api/now/sp/page?id=landing&time=$UnixEpochTime&portal_id=$Portal_ID&request_uri=%2Fcsm%3Fid%3Dlanding" -WebSession $ServiceNow_Session).Content
             $Glide_SSO_ID = Parse-String -String $AESMP_LandingPage -StartStr '"href":"/login_with_sso.do?glide_sso_id=' -EndStr "`""
+            ##$AESMP_SSO_Endpoint = Parse-String -String $AESMP_LandingPage -StartStr '"href":"' -EndStr '"'
 
             #Retrieve HTTP Redirect for EAMS Authentication
             $AESMP_Login_SSO = Invoke-WebRequest -UseBasicParsing -Uri "https://$ServiceNow_Server/login_with_sso.do?glide_sso_id=$Glide_SSO_ID" -WebSession $ServiceNow_Session
+            ##$AESMP_Login_SSO = Invoke-WebRequest -UseBasicParsing -Uri "https://$ServiceNow_Server$AESMP_SSO_Endpoint" -WebSession $ServiceNow_Session
             $EAMS_Redirect_URL = $AESMP_Login_SSO.BaseResponse.ResponseUri.AbsoluteUri
             $EAMS_Redirect = Invoke-RestMethod -UseBasicParsing -Uri $EAMS_Redirect_URL -WebSession $ServiceNow_Session
             $EAMS_URL = Parse-String -String $EAMS_Redirect -StartStr "top.location.href = '" -EndStr "'"
