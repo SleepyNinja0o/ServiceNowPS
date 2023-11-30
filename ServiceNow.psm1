@@ -316,7 +316,7 @@ $Name
 function Get-ServiceNowRecord{
 param(
 [Parameter(Mandatory)]
-[ValidateSet("ChangeRequest","ChangeTask","CustomerServiceCase","Group","Incident","Request","RequestItem","ScheduledTask","User","ConfigurationItem")]
+[ValidateSet("ChangeRequest","ChangeTask","CustomerServiceCase","Email","Group","Incident","Request","RequestItem","ScheduledTask","User","ConfigurationItem")]
 $RecordType,
 $SysID,
 $FirstName,
@@ -324,11 +324,25 @@ $LastName,
 $GroupName,
 $ComputerName,
 $GroupNameSearch,
+[ValidateSet("ChangeRequest","ChangeTask","CustomerServiceCase","Email","Group","Incident","Request","RequestItem","ScheduledTask","User","ConfigurationItem")]
+$TicketType,
 $TicketNumber,
 $TicketSearch,
 [switch]$GetHistory
 )
     switch ($RecordType.toLower()){
+        "email" {
+            $RecordTypeURL = "sys_email_list.do"
+            if ($SysID){
+                $SN_Query = "sys_id=$SysID"
+            }elseif($TicketNumber -and $TicketType){
+                $SysID = (Get-ServiceNowRecord -RecordType $TicketType -TicketNumber $TicketNumber).sys_id
+                $SN_Query = "sys_id=$SysID"
+            }else{
+                Write-Host "A Sys ID or TicketType/TicketNumber is required to run this command." -ForegroundColor Red
+                return
+            }
+        }
         "user" {
             $RecordTypeURL = "sys_user_list.do"
             if ($SysID){
