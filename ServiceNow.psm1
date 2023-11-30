@@ -476,6 +476,7 @@ $TicketSearch,
     }
 
     if($GetHistory.IsPresent){
+        if($RecordType -notmatch "incident|scheduledtask|customerservicecase"){Write-Host "The GetHistory switch is only compatible with Incident, ScheduledTask, and CustomerServiceCase." -ForegroundColor Red;return}
         $RecordType2 = $RecordTypeURL -replace "_list\.do",""
         if($SysID -eq $null -and $TicketNumber){
             $SysID = (Get-ServiceNowRecord -RecordType $RecordType -TicketNumber $TicketNumber).sys_id
