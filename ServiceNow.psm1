@@ -1099,9 +1099,14 @@ param(
             return $ServiceNow_WR
         }catch{
             if($Retry -eq 3){
-                Write-Host "Failed to submit web request 3 times in a row...Try again?(y/n): " -ForegroundColor Red -NoNewline
+                Write-Host "Failed to submit web request 3 times in a row..." -ForegroundColor Red
+                Write-Host  "Try again?(y/n): " -ForegroundColor Yellow -NoNewline
                 $resp = Read-Host
-                if($resp.ToLower() -match "y|yes"){$Retry=0}else{return}
+                if($resp.ToLower() -match "y|yes"){
+                    $Retry=0
+                }else{
+                    break
+                }
             }else{
                 Write-Host "Error occured while submitting web request to SNOW! Retrying..." -ForegroundColor Yellow
                 Start-Sleep -Seconds 2
