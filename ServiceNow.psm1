@@ -1122,6 +1122,7 @@ function New-ServiceNowWebRequest{
 param(
     $Endpoint,
     [ValidateSet("GET","POST")]$Method="GET",
+    $Headers,
     $ContentType,
     $Body,
     [switch]$REST
@@ -1132,11 +1133,12 @@ param(
         try{
             if($REST.IsPresent){
                 $ServiceNow_WR = Invoke-RestMethod -UseBasicParsing "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
-                -Method $Method -ContentType $ContentType -Body $Body
+                -Method $Method -ContentType $ContentType -Body $Body -Headers $Headers
             }else{
                 $ServiceNow_WR = Invoke-WebRequest -UseBasicParsing "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
-                -Method $Method -ContentType $ContentType -Body $Body
+                -Method $Method -ContentType $ContentType -Body $Body -Headers $Headers
             }
+            if($Headers){Restore-ServiceNowHeaders}
             return $ServiceNow_WR
         }catch{
             if($Retry -eq 3){
@@ -1214,6 +1216,11 @@ function New-SNSessionRefresher{
     $ServiceNow_Session_Timer.Interval = 570000
     $ServiceNow_Session_Timer.AutoReset = $True
     $ServiceNow_Session_Timer.Enabled = $True
+}
+
+function Restore-ServiceNowHeaders{
+    $ServiceNow_Session.Headers.Clear()
+    $ServiceNow_Session.Headers.Add("X-UserToken",$SN_User_Token)
 }
 
 function Search-ServiceNowCustomer{
