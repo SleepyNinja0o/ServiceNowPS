@@ -513,6 +513,40 @@ $TicketSearch,
     return (New-ServiceNowWebRequest -Endpoint "/$($RecordTypeURL)?JSONv2&sysparm_query=$SN_Query" -REST).records
 }
 
+function Get-ServiceNowServicePortalElements{
+param(
+    $SysID,
+    $SysparmCategory
+)
+    $SN_SP_Item_Content = (New-ServiceNowWebRequest -Endpoint "/sp?id=sc_cat_item&sys_id=$SysID&sysparm_category=$SysparmCategory").Content
+    $SN_SP_PortalID = Parse-String -String $SN_SP_Item_Content -StartStr "`"portal_id = '" -EndStr "'"
+
+    $UnixEpoch = ((Get-Date -UFormat %s) -replace "\.","").Substring(0,13)
+    $SN_SP_API = New-ServiceNowWebRequest -Endpoint "/api/now/sp/page?id=sc_cat_item&sys_id=$SysID&sysparm_category=$SysparmCategory&time=$UnixEpoch&portal_id=$SN_SP_PortalID" -Headers @{
+        "x-portal" = $SN_SP_PortalID
+        "X-Requested-With" = "XMLHttpRequest"
+    }
+    $Global:SN_SP_API_Content = $SN_SP_API.Content
+
+    $x0 = $SN_SP_API_Content.IndexOf('"_fields":{')
+    $x1 = $SN_SP_API_Content.IndexOf("{",$x0+1)
+    $x = $x1
+
+    $i=1
+    foreach ($char in [char[]]$SN_SP_API_Content.Substring($x+1)){
+        $x++
+        if($char -eq "{"){$i++}
+        if($char -eq "}"){$i--}
+        if($i -eq 0){
+            $global:x2=$x
+            break
+        }
+    }
+
+    $SN_SP_API_Content_Elements = ConvertFrom-Json -InputObject ($SN_SP_API_Content.Substring($x1,$x2-$x1+1))
+    return ($SN_SP_API_Content_Elements | Get-Member -MemberType NoteProperty).Name
+}
+
 function Get-ServiceNowServices {
     $global:ServiceNowServicesFilePath = "$($PSScriptRoot)\ServiceNow_Services.json"
 
@@ -1429,6 +1463,7 @@ Export-ModuleMember -Function Get-AuthCertificate
 Export-ModuleMember -Function Get-ServiceNowCategories
 Export-ModuleMember -Function Get-ServiceNowGroups
 Export-ModuleMember -Function Get-ServiceNowRecord
+Export-ModuleMember -Function Get-ServiceNowServicePortalElements
 Export-ModuleMember -Function Get-ServiceNowServices
 Export-ModuleMember -Function Get-ServiceNowStats
 Export-ModuleMember -Function Get-ServiceNowUserUnique
