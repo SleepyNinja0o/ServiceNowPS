@@ -1,5 +1,6 @@
-Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
-Add-Type -AssemblyName System.Net.Http
+Add-Type -AssemblyName "System.Windows.Forms"
+Add-Type -AssemblyName "System.Web"
+
 $Global:ServiceNow_Server = "https://*****.service-now.com"
 $Global:ServiceNow_Lists = @{}
 
@@ -86,78 +87,97 @@ $File
         return
     }
 
-    #Upload Attachment to Ticket in ServiceNow
     if($File -and (Test-Path $File -PathType Leaf)){
         $FileOb = Get-Item $File
-        $SN_Attachment_File = @{
-            'SafeFileName' = $FileOb.FullName.substring($FileOb.FullName.LastIndexOf("\")+1)
+        $Global:SN_Attachment_File = @{
+            'SafeFileName' = $FileOb.FullName.Substring($FileOb.FullName.LastIndexOf("\")+1)
             'FileName' = $FileOb.FullName
         }
     }else{
-        $SN_Attachment_File = Get-File
+        $Global:SN_Attachment_File = Get-File
     }
 
-    $SN_Attachment_FileName = $SN_Attachment_File.SafeFileName
-    $SN_Attachment_Table_Name = $TicketType
-    $SN_Attachment_Table_Sys_Id = $TicketSysID
-    $SN_Attachment_Content_Type = Get-MimeType $SN_Attachment_File.FileName
-    $SN_Attachment_Payload_File = $SN_Attachment_File.FileName
-    $SN_Attachment_Payload_File_Bin = [IO.File]::ReadAllBytes($SN_Attachment_Payload_File)
     $SN_Attachment_Encoding = [System.Text.Encoding]::GetEncoding("iso-8859-1")
+    $SN_Attachment_Payload_File_Bin = [IO.File]::ReadAllBytes($SN_Attachment_File.FileName)
     $SN_Attachment_Payload_File_Encoding = $SN_Attachment_Encoding.GetString($SN_Attachment_Payload_File_Bin)
+    $SN_Attachment_File | Add-Member -MemberType NoteProperty -Name "Contents" -Value $SN_Attachment_Payload_File_Encoding
+    $SN_Attachment_File | Add-Member -MemberType NoteProperty -Name "MimeType" -Value (Get-MimeType -File $SN_Attachment_File.FileName)
+
     $SN_Attachment_GUID = ((New-Guid).Guid | Out-String).Trim()
+    $SN_Attachment_Boundary = "-----------------------------$SN_Attachment_GUID"
     $LF = "`r`n"
-    $SN_Attachment_Body = (
-        "-----------------------------$SN_Attachment_GUID",
-        "Content-Disposition: form-data; name=`"sysparm_ck`"",
-        "",
-        $SN_User_Token,
-        "-----------------------------$SN_Attachment_GUID",
-        "Content-Disposition: form-data; name=`"attachments_modified`"",
-        "",
-        "",
-        "-----------------------------$SN_Attachment_GUID",
-        "Content-Disposition: form-data; name=`"sysparm_sys_id`"",
-        "",
-        $SN_Attachment_Table_Sys_Id,
-        "-----------------------------$SN_Attachment_GUID",
-        "Content-Disposition: form-data; name=`"sysparm_table`"",
-        "",
-        $SN_Attachment_Table_Name,
-        "-----------------------------$SN_Attachment_GUID",
-        "Content-Disposition: form-data; name=`"max_size`"",
-        "",
-        "1024",
-        "-----------------------------$SN_Attachment_GUID",
-        "Content-Disposition: form-data; name=`"file_types`"",
-        "",
-        "",
-        "-----------------------------$SN_Attachment_GUID",
-        "Content-Disposition: form-data; name=`"sysparm_nostack`"",
-        "",
-        "yes",
-        "-----------------------------$SN_Attachment_GUID",
-        "Content-Disposition: form-data; name=`"sysparm_redirect`"",
-        "",
-        "attachment_uploaded.do?sysparm_domain_restore=false&sysparm_nostack=yes",
-        "-----------------------------$SN_Attachment_GUID",
-        "Content-Disposition: form-data; name=`"sysparm_encryption_context`"",
-        "",
-        "",
-        "-----------------------------$SN_Attachment_GUID",
-        "Content-Disposition: form-data; name=`"attachFile`"; filename=`"$SN_Attachment_FileName`"",
-        "Content-Type: $SN_Attachment_Content_Type",
-        "",
-        $SN_Attachment_Payload_File_Encoding,
-        "-----------------------------$SN_Attachment_GUID--",
-        ""
-    ) -join $LF
+
+    $Global:SN_MultipartFormHashTable = @(
+        @{
+            "Name" ="sysparm_ck"
+            "Value"=$SN_User_Token
+        }
+        @{
+            "Name" ="attachments_modified"
+            "Value"=""
+        }
+        @{
+            "Name" ="sysparm_sys_id"
+            "Value"=$TicketSysID
+        }
+        @{
+            "Name" ="sysparm_table"
+            "Value"=$TicketType
+        }
+        @{
+            "Name" ="max_size"
+            "Value"="1024"
+        }
+        @{
+            "Name" ="file_types"
+            "Value"=""
+        }
+        @{
+            "Name" ="sysparm_nostack"
+            "Value"="yes"
+        }
+        @{
+            "Name" ="sysparm_redirect"
+            "Value"="attachment_uploaded.do?sysparm_domain_restore=false&sysparm_nostack=yes"
+        }
+        @{
+            "Name" ="sysparm_encryption_context"
+            "Value"=""
+        }
+        @{
+            "Name"="attachFile"
+            "Filename"=$SN_Attachment_File.SafeFileName
+            "MimeType"=$SN_Attachment_File.MimeType
+            "Value"=$SN_Attachment_File.Contents
+        }
+    )
+
+    $Global:SN_Attachment_Body = @()
+    foreach($FormItem in $SN_MultipartFormHashTable){
+        Write-Host "*****$($FormItem.Name)*****"
+        if($FormItem.Name -eq "attachFile"){
+            $SN_Attachment_Body += $SN_Attachment_Boundary
+            $SN_Attachment_Body += "Content-Disposition: form-data; name=`"$($FormItem.Name)`"; filename=`"$($FormItem.FileName)`""
+            $SN_Attachment_Body += "Content-Type: $($FormItem.MimeType)"
+            $SN_Attachment_Body += ""
+            $SN_Attachment_Body += $FormItem.Value
+            $SN_Attachment_Body += "$SN_Attachment_Boundary--"
+            $SN_Attachment_Body += ""
+        }else{
+            $SN_Attachment_Body += $SN_Attachment_Boundary
+            $SN_Attachment_Body += "Content-Disposition: form-data; name=`"$($FormItem.Name)`""
+            $SN_Attachment_Body += ""
+            $SN_Attachment_Body += $FormItem.Value
+        }
+        $SN_Attachment_Body | Out-String
+        Write-Host "**********************************************"
+    }
+    $SN_Attachment_Body = $SN_Attachment_Body -join $LF
 
     try{
-        #$global:SN_Submit_Attachment = Invoke-WebRequest -Uri "https://$ServiceNow_Server/sys_attachment.do?sysparm_record_scope=global" -Method "POST" -ContentType "multipart/form-data; boundary=---------------------------$SN_Attachment_GUID" -Body $SN_Attachment_Body -WebSession $ServiceNow_Session
-        $global:SN_Submit_Attachment = New-ServiceNowWebRequest -Endpoint "/sys_attachment.do?sysparm_record_scope=global" -Method Post -ContentType "multipart/form-data; boundary=---------------------------$SN_Attachment_GUID" -Body $SN_Attachment_Body
+        $global:SN_Submit_Attachment = New-ServiceNowWebRequest -Endpoint "/sys_attachment.do?sysparm_record_scope=global" -Method Post -ContentType "multipart/form-data; boundary=$($SN_Attachment_Boundary.Substring(2))" -Body $SN_Attachment_Body
         if ($SN_Submit_Attachment.StatusCode -eq "200") {
-            Write-Host "*** Successfully Submitted Attachment `"$SN_Attachment_FileName`" for Ticket $TicketNumber ***" -ForegroundColor Green
+            Write-Host "*** Successfully Submitted Attachment `"$($SN_Attachment_File.SafeFileName)`" for Ticket $TicketNumber ***" -ForegroundColor Green
         }else{
             Write-Host "File attachment upload failed!`nStatus: $($SN_Submit_Attachment.StatusCode)`n"
         }
@@ -242,12 +262,11 @@ function Get-File {
 }
 
 function Get-MimeType {
-    param( 
-        [Parameter(Mandatory, ValueFromPipeline=$true, Position=0)] 
-        [ValidateScript({Test-Path $_})]
-        [String]$File
-        )
-    Add-Type -AssemblyName "System.Web"
+param( 
+[Parameter(Mandatory, ValueFromPipeline=$true, Position=0)] 
+[ValidateScript({Test-Path $_})]
+[String]$File
+)
     [System.Web.MimeMapping]::GetMimeMapping($File)
 }
 
