@@ -1,4 +1,5 @@
 Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+Add-Type -AssemblyName System.Net.Http
 $Global:ServiceNow_Server = "https://*****.service-now.com"
 $Global:ServiceNow_Lists = @{}
 
@@ -1100,8 +1101,8 @@ param(
 function New-ServiceNowWebRequest{
 param(
     $Endpoint,
-    [ValidateSet("Get","Post")]$Method="Get",
-    $ContentType="",
+    [ValidateSet("GET","POST")]$Method="GET",
+    $ContentType,
     $Body,
     [switch]$REST
 )
@@ -1110,21 +1111,11 @@ param(
     for($Retry=1;$Retry -le 3;$Retry++){
         try{
             if($REST.IsPresent){
-                if($Body -ne $null -and $Body -ne ""){
-                    $ServiceNow_WR = Invoke-RestMethod -UseBasicParsing "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
-                    -Method $Method -ContentType $ContentType -Body $Body
-                }else{
-                    $ServiceNow_WR = Invoke-RestMethod -UseBasicParsing "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
-                    -Method $Method
-                }
+                $ServiceNow_WR = Invoke-RestMethod -UseBasicParsing "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
+                -Method $Method -ContentType $ContentType -Body $Body
             }else{
-                if($Body -ne $null -and $Body -ne ""){
-                    $ServiceNow_WR = Invoke-WebRequest -UseBasicParsing "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
-                    -Method $Method -ContentType $ContentType -Body $Body
-                }else{
-                    $ServiceNow_WR = Invoke-WebRequest -UseBasicParsing "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
-                    -Method $Method
-                }
+                $ServiceNow_WR = Invoke-WebRequest -UseBasicParsing "https://$ServiceNow_Server$Endpoint" -WebSession $ServiceNow_Session `
+                -Method $Method -ContentType $ContentType -Body $Body
             }
             return $ServiceNow_WR
         }catch{
@@ -1367,8 +1358,6 @@ function Update-ServiceNowServices {
     #$ServiceNow_Services = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/cmdb_ci_service_list.do?JSONv2&sysparm_target=incident.business_service" -WebSession $ServiceNow_Session -Headers @{"X-UserToken"=$SN_User_Token}).records | where {$_.name -ne "" -and $_.name -ne $null} | select name,sys_id | sort name | ConvertTo-Json | Out-File $ServiceNowServicesFilePath -Force
     Write-Host "Service Now Services JSON file updated successfully!" -ForegroundColor Green
 }
-
-
 
 Export-ModuleMember -Function Add-ServiceNowAttachment
 Export-ModuleMember -Function Close-ServiceNowIncident
