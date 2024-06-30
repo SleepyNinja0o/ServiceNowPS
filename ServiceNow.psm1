@@ -212,6 +212,7 @@ $SysID,$TicketNum,$State,$CloseCode,$CloseNotes
 }
 
 function Close-ServiceNowSession{
+    New-ServiceNowWebRequest -Endpoint "/logout.do" | Out-Null
     Get-EventSubscriber -Force | Unregister-Event -Force
     if($ServiceNow_Session_Timer){$ServiceNow_Session_Timer.enabled = $false}
     Remove-Variable -Name "ServiceNow_*", "SN_*" -Scope Global -ErrorAction SilentlyContinue
