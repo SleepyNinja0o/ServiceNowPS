@@ -1156,6 +1156,41 @@ param(
     }
 }
 
+function New-ServiceNowWorkNote{
+param(
+[Parameter(Mandatory=$true)]
+[ValidateSet("ChangeRequest","ChangeTask","Incident","Request","RequestItem","ScheduledTask")]
+$RecordType,
+[Parameter(Mandatory=$false)]
+$SysID,
+[Parameter(Mandatory=$false)]
+$TicketNumber,
+[Parameter(Mandatory=$true)]
+$Note
+)
+    $body = @{"entries"=@()}
+    $body.entries += [ordered]@{"field"="work_notes";"text"=$Note}
+    $body = ConvertTo-Json -InputObject $body -Depth 100 -Compress
+
+    switch ($RecordType.toLower()){
+        "scheduledtask" {$RecordTypeURL = "sc_task"}
+        "changerequest" {$RecordTypeURL = "change_request"}
+        "changetask" {$RecordTypeURL = "change_task"}
+        "incident" {$RecordTypeURL = "incident"}
+        "request" {$RecordTypeURL = "sc_request"}
+        "requestitem" {$RecordTypeURL = "sc_req_item"}
+        "customerservicecase" {$RecordTypeURL = "sn_customerservice_case"}
+        Default {}
+    }
+
+    if($TicketNumber){
+        $SysID = (Get-ServiceNowRecord -RecordType $RecordType -TicketNumber $TicketNumber).sys_id
+    }
+
+    $global:ServiceNowWorkNote = New-ServiceNowWebRequest -Endpoint "/angular.do?sysparm_type=list_history&action=insert&table=$RecordTypeURL&sys_id=$SysID&sysparm_timestamp=&sysparm_source=from_form" -Method Post -ContentType "application/json;charset=utf-8" -Body $body -Headers $Headers -REST
+    return $global:ServiceNowWorkNote
+}
+
 function New-SNSessionRefresher{
     $global:ServiceNow_Session_Timer = New-Object System.Timers.Timer
 
@@ -1396,6 +1431,7 @@ Export-ModuleMember -Function Get-ServiceNowList
 #Export-ModuleMember -Function New-ServiceNowSCTask           #This functions needs additional review/recoding
 Export-ModuleMember -Function New-ServiceNowSession
 Export-ModuleMember -Function New-ServiceNowWebRequest
+Export-ModuleMember -Function New-ServiceNowWorkNote
 Export-ModuleMember -Function Search-ServiceNowCustomer
 Export-ModuleMember -Function Search-ServiceNowRecord
 Export-ModuleMember -Function Update-ServiceNowCategories
