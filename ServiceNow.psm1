@@ -462,7 +462,7 @@ $TicketSearch,
             }
         }
         "configurationitem" {
-            $RecordTypeURL = "cmdb_ci_pc_hardware.do"
+            $RecordTypeURL = "cmdb_ci.do"
             if ($SysID){
                 $SN_Query = "sys_id=$SysID"
             }elseif($ComputerName){
