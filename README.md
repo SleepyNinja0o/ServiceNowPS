@@ -10,6 +10,6 @@ The JSONv2 web service does not require API access, it only requires the "ITIL" 
 #Username/Password authentication - Server is not needed if global Server variable is changed at top of script
 New-ServiceNowSession -Server "******.service-now.com" -Username "admin" -Pass "pass"
 
-#AESMP authentication - Defaults to Smart Card authentication based on Server URL
-New-ServiceNowSession -Server "www.aesmp.army.mil"
+#Smart Card authentication
+New-ServiceNowSession -Server "******.service-now.com" -CertificateAuth
 ```
