@@ -432,11 +432,27 @@ function Get-ServiceNowGroups {
 function Get-ServiceNowList{
 <#
 .SYNOPSIS
-Retrieves a Choice/Pick list's labels and values in ServiceNow.
+    Retrieves a Choice/Pick list's labels and values in ServiceNow.
+
+.DESCRIPTION
+    This function retrieves the labels and values of a specified choice or pick list in ServiceNow.
+    If the list is already stored in the `$ServiceNow_Lists` variable, it returns the stored list.
+    Otherwise, it fetches the list from ServiceNow and stores it in `$ServiceNow_Lists`.
+
+.PARAMETER Name
+    The name of the choice or pick list to retrieve.
 
 .EXAMPLE
-$ServiceNow_Incident_States = Get-ServiceNowList -Name "incident.state"
+    $ServiceNow_Incident_States = Get-ServiceNowList -Name "incident.state"
+
+    Retrieves the labels and values for the incident state choice list and stores them in the `$ServiceNow_Lists` variable and returns the data.
+
+.NOTES
+    The function uses the `New-ServiceNowWebRequest` function to send requests to the ServiceNow instance.
+    The retrieved list is stored in the `$ServiceNow_Lists` variable for future use.
+
 #>
+
 param(
 $Name
 )
@@ -451,6 +467,74 @@ $Name
 }
 
 function Get-ServiceNowRecord{
+<#
+.SYNOPSIS
+    Retrieves a specific record or list of records from ServiceNow based on the provided parameters.
+
+.DESCRIPTION
+    This function fetches records from various ServiceNow tables such as ChangeRequest, Incident, User, etc.
+    It constructs a query based on the provided parameters like SysID, TicketNumber, FirstName, LastName, GroupName, etc., and retrieves the corresponding records.
+    The function can also retrieve the history of a record if the GetHistory switch is used.
+
+.PARAMETER RecordType
+    The type of record to retrieve. Valid values are: ChangeRequest, ChangeTask, CustomerServiceCase, Email, Group, Incident, Request, RequestItem, ScheduledTask, User, ConfigurationItem.
+
+.PARAMETER SysID
+    The unique identifier of the record.
+
+.PARAMETER FirstName
+    The first name of the user to search for in the User table.
+
+.PARAMETER LastName
+    The last name of the user to search for in the User table.
+
+.PARAMETER GroupName
+    The name of the group to search for in the Group table.
+
+.PARAMETER ComputerName
+    The name of the computer to search for in the ConfigurationItem table.
+
+.PARAMETER GroupNameSearch
+    A partial name to search for groups in the Group table.
+
+.PARAMETER TicketType
+    The type of ticket to search for. Valid values are: ChangeRequest, ChangeTask, CustomerServiceCase, Email, Group, Incident, Request, RequestItem, ScheduledTask, User, ConfigurationItem.
+
+.PARAMETER TicketNumber
+    The ticket number to search for.
+
+.PARAMETER TicketSearch
+    A partial description to search for tickets.
+
+.PARAMETER GetHistory
+    A switch to retrieve the history of a record. Only compatible with Incident, ScheduledTask, and CustomerServiceCase.
+
+.EXAMPLE
+    Get-ServiceNowRecord -RecordType Incident -SysID e55d0bfec343101035ae3f52c1d3ae49
+
+    Retrieves the incident record with the specified SysID.
+
+.EXAMPLE
+    Get-ServiceNowRecord -RecordType User -FirstName John -LastName Doe
+
+    Retrieves the user record with the specified first and last name.
+
+.EXAMPLE
+    Get-ServiceNowRecord -RecordType Incident -TicketNumber INC0012345
+
+    Retrieves the incident record with the specified ticket number.
+
+.EXAMPLE
+    Get-ServiceNowRecord -RecordType Incident -SysID e55d0bfec343101035ae3f52c1d3ae49 -GetHistory
+
+    Retrieves the history of the incident record with the specified SysID.
+
+.NOTES
+    The function constructs a query based on the provided parameters and retrieves the corresponding records from ServiceNow.
+    If the GetHistory switch is used, it fetches the history of the specified record.
+
+#>
+
 param(
 [Parameter(Mandatory)]
 [ValidateSet("ChangeRequest","ChangeTask","CustomerServiceCase","Email","Group","Incident","Request","RequestItem","ScheduledTask","User","ConfigurationItem")]
@@ -629,6 +713,7 @@ $TicketSearch,
     return (New-ServiceNowWebRequest -Endpoint "/$($RecordTypeURL)?JSONv2&sysparm_query=$SN_Query" -REST).records
 }
 
+#From here and below still need comment based help
 function Get-ServiceNowServicePortalElements{
 param(
     $SysID,
