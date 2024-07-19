@@ -1409,37 +1409,18 @@ function Update-ServiceNowCategories {
     $SN_CategoryListHash = [ordered]@{}
     
     $SN_CategoryList = Get-ServiceNowList -Name "incident.category"
-    <#
-    $CategoryList = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" `
-    -Method "POST" `
-    -WebSession $ServiceNow_Session `
-    -Headers @{
-        "X-UserToken"=$SN_User_Token
-    } `
-    -ContentType "application/x-www-form-urlencoded; charset=UTF-8" `
-    -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_name=incident.category&sysparm_chars=*&sysparm_nomax=true").xml[1].ChildNodes.Name
-    #>
 
     foreach($Cat in $SN_CategoryList){
         if($i%5 -eq 0){
             Write-Host "$([int](($i/88)*100))%.." -NoNewline
         }
 
-        $wr = New-ServiceNowWebRequest -Endpoint "/xmlhttp.do" -Method Post -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_value=$cat&sysparm_name=incident.subcategory&sysparm_chars=*&sysparm_nomax=true" -REST
-        <#
-        $wr = Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/xmlhttp.do" `
-        -Method "POST" `
-        -WebSession $ServiceNow_Session `
-        -Headers @{
-            "X-UserToken"=$SN_User_Token
-        } `
-        -ContentType "application/x-www-form-urlencoded; charset=UTF-8" `
-        -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_value=$cat&sysparm_name=incident.subcategory&sysparm_chars=*&sysparm_nomax=true"
-        #>
+        $SubCats_WR = New-ServiceNowWebRequest -Endpoint "/xmlhttp.do" -Method Post -ContentType "application/x-www-form-urlencoded; charset=UTF-8" -Body "sysparm_processor=PickList&sysparm_scope=global&sysparm_want_session_messages=true&sysparm_value=$($Cat.value)&sysparm_name=incident.subcategory&sysparm_chars=*&sysparm_nomax=true" -REST
 
-        $SN_CategoryListHash[$Cat] = $wr.xml[1].ChildNodes.name
+        $SN_CategoryListHash[$($Cat.name)] = $SubCats_WR.xml[1].ChildNodes.name
         $i++
     }
+
     Write-Host "100%..Download Complete! Saving to file..."
     $SN_CategoryListHash.GetEnumerator() | ConvertTo-Json | Out-File $SN_CATsFilePath -Verbose
     Write-Host "`nService Now Categories JSON file updated successfully!" -ForegroundColor Green
