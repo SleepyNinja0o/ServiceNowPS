@@ -187,6 +187,46 @@ $File
 }
 
 function Close-ServiceNowIncident{
+<#
+.SYNOPSIS
+    Closes a ServiceNow incident.
+
+.DESCRIPTION
+    This function closes a ServiceNow incident using the specified SysID or Ticket Number.
+    If the incident is resolved, it requires a Close Code and Close Notes.
+
+.PARAMETER SysID
+    The SysID of the ServiceNow incident to be closed. If not provided, the function attempts to retrieve it using the Ticket Number.
+
+.PARAMETER TicketNum
+    The Ticket Number of the ServiceNow incident to be closed. If provided, the function retrieves the SysID using this Ticket Number.
+
+.PARAMETER State
+    The state to which the incident should be set. Can be an integer or a string that will be converted to the corresponding integer.
+
+.PARAMETER CloseCode
+    The close code for the incident. Required if the state is set to Resolved.
+
+.PARAMETER CloseNotes
+    The close notes for the incident. Required if the state is set to Resolved.
+
+.EXAMPLE
+    Close-ServiceNowIncident -SysID "1234567890abcdef" -State 6
+
+    Closes the incident with the specified SysID and sets its state to 6.
+
+.EXAMPLE
+    Close-ServiceNowIncident -TicketNum "INC0012345" -State "Resolved" -CloseCode "Solved (Permanently)" -CloseNotes "Issue resolved after software update."
+
+    Closes the incident with the specified Ticket Number, sets its state to Resolved, and provides the required Close Code and Close Notes.
+
+.NOTES
+    If the Ticket Number is provided, the function retrieves the SysID using the Get-ServiceNowRecord function.
+    If the SysID is not found or not provided, the function exits with an error message.
+    If the State is a string, it attempts to convert it to the corresponding integer value using the Get-ServiceNowList function.
+    If the State is Resolved, the function validates and requires the Close Code and Close Notes.
+
+#>
 param(
 $SysID,$TicketNum,$State,$CloseCode,$CloseNotes
 )
@@ -212,6 +252,23 @@ $SysID,$TicketNum,$State,$CloseCode,$CloseNotes
 }
 
 function Close-ServiceNowSession{
+<#
+.SYNOPSIS
+    Closes the current ServiceNow session and cleans up session-related variables and event subscribers.
+
+.DESCRIPTION
+    This function logs out of the current ServiceNow session, unregisters all event subscribers, disables the session timer, and removes all ServiceNow-related variables from the global scope.
+
+.EXAMPLE
+    Close-ServiceNowSession
+
+    Logs out of the current ServiceNow session and performs cleanup of session-related resources.
+
+.NOTES
+    The function sends a logout request to the ServiceNow instance.
+    It unregisters all event subscribers, disables the ServiceNow session timer if it exists, and removes ServiceNow-related variables from the global scope.
+
+#>
     New-ServiceNowWebRequest -Endpoint "/logout.do" | Out-Null
     Get-EventSubscriber -Force | Unregister-Event -Force
     if($ServiceNow_Session_Timer){$ServiceNow_Session_Timer.enabled = $false}
@@ -219,6 +276,23 @@ function Close-ServiceNowSession{
 }
 
 function Confirm-ServiceNowSession{
+<#
+.SYNOPSIS
+    Confirms the current ServiceNow session and refreshes it if expired.
+
+.DESCRIPTION
+    This function checks if the current ServiceNow session is valid. If the session is found to be expired, it refreshes the session. If no session is found, it initializes a new session.
+
+.EXAMPLE
+    Confirm-ServiceNowSession
+
+    Checks the current ServiceNow session. If the session is expired, it refreshes the session. If no session is found, it initializes a new session.
+
+.NOTES
+    This function uses the New-ServiceNowWebRequest function to send requests to the ServiceNow instance.
+    If the session is found to be expired, it disables the session timer, unregisters the related event, and initializes a new session using the New-ServiceNowSession function.
+
+#>
     if($ServiceNow_Session){
         #$SN_User_Profile_Page_Refresh = (Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -WebSession $ServiceNow_Session).records
         $SN_User_Profile_Page_Refresh = (New-ServiceNowWebRequest -Endpoint "/sys_user.do?JSONv2&sysparm_action=get&sysparm_sys_id=$SN_UserID" -REST).records
