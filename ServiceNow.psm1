@@ -281,7 +281,9 @@ function Confirm-ServiceNowSession{
     Confirms the current ServiceNow session and refreshes it if expired.
 
 .DESCRIPTION
-    This function checks if the current ServiceNow session is valid. If the session is found to be expired, it refreshes the session. If no session is found, it initializes a new session.
+    This function checks if the current ServiceNow session is valid.
+    If the session is found to be expired, it refreshes the session.
+    If no session is found, it initializes a new session.
 
 .EXAMPLE
     Confirm-ServiceNowSession
@@ -346,6 +348,26 @@ param(
 }
 
 function Get-ServiceNowCategories {
+<#
+.SYNOPSIS
+    Retrieves the ServiceNow categories from a JSON file.
+
+.DESCRIPTION
+    This function checks for the presence of a ServiceNow categories JSON file.
+    If the file exists, it imports the categories into a global variable.
+    If the file does not exist, it prompts the user to download the latest categories file and updates the global variable accordingly.
+
+.EXAMPLE
+    Get-ServiceNowCategories
+
+    Retrieves the ServiceNow categories from the JSON file if it exists. If the file does not exist, prompts the user to download the latest categories file.
+
+.NOTES
+    The function checks for the presence of the ServiceNow categories JSON file at the path defined by `$PSScriptRoot\ServiceNow_Categories.json`.
+    If the file is found, it imports the JSON content into the `$global:ServiceNow_Categories` variable.
+    If the file is not found, it prompts the user to download the latest categories file using the `Update-ServiceNowCategories` function.
+
+#>
     $global:SN_CATsFilePath = "$($PSScriptRoot)\ServiceNow_Categories.json"
 
     if(Test-Path $SN_CATsFilePath){
@@ -367,6 +389,26 @@ function Get-ServiceNowCategories {
 }
 
 function Get-ServiceNowGroups {
+<#
+.SYNOPSIS
+    Retrieves the ServiceNow groups from a JSON file.
+
+.DESCRIPTION
+    This function checks for the presence of a ServiceNow groups JSON file.
+    If the file exists, it imports the groups into a global variable.
+    If the file does not exist, it prompts the user to download the latest groups file and updates the global variable accordingly.
+
+.EXAMPLE
+    Get-ServiceNowGroups
+
+    Retrieves the ServiceNow groups from the JSON file if it exists. If the file does not exist, prompts the user to download the latest groups file.
+
+.NOTES
+    The function checks for the presence of the ServiceNow groups JSON file at the path defined by `$PSScriptRoot\ServiceNow_Groups.json`.
+    If the file is found, it imports the JSON content into the `$global:ServiceNow_Groups` variable.
+    If the file is not found, it prompts the user to download the latest groups file using the `Update-ServiceNowGroups` function.
+
+#>
     $global:SN_GroupsFilePath = "$($PSScriptRoot)\ServiceNow_Groups.json"
 
     if(Test-Path $SN_GroupsFilePath){
