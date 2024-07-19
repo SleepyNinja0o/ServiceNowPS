@@ -1533,7 +1533,9 @@ Export-ModuleMember -Function Add-ServiceNowAttachment
 Export-ModuleMember -Function Close-ServiceNowIncident
 Export-ModuleMember -Function Close-ServiceNowSession
 Export-ModuleMember -Function Confirm-ServiceNowSession
-Export-ModuleMember -Function Get-AuthCertificate
+#Export-ModuleMember -Function Get-AuthCertificate
+#Export-ModuleMember -Function Get-File
+#Export-ModuleMember -Function Get-MimeType
 Export-ModuleMember -Function Get-ServiceNowCategories
 Export-ModuleMember -Function Get-ServiceNowGroups
 Export-ModuleMember -Function Get-ServiceNowRecord
