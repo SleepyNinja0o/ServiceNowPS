@@ -713,12 +713,36 @@ $TicketSearch,
     return (New-ServiceNowWebRequest -Endpoint "/$($RecordTypeURL)?JSONv2&sysparm_query=$SN_Query" -REST).records
 }
 
-#From here and below still need comment based help
 function Get-ServiceNowServicePortalElements{
 param(
     $SysID,
     $SysparmCategory
 )
+<#
+.SYNOPSIS
+    Retrieves Service Portal elements for a given ServiceNow Service Catalog item.
+
+.DESCRIPTION
+    This function retrieves the elements of a ServiceNow Service Portal page for a specified Service Catalog item.
+    It uses the SysID and category to fetch the Service Portal content and parses the necessary elements from the response.
+
+.PARAMETER SysID
+    The SysID of the ServiceNow Service Catalog item.
+
+.PARAMETER SysparmCategory
+    The category of the ServiceNow Service Catalog item.
+
+.EXAMPLE
+    Get-ServiceNowServicePortalElements -SysID "abc123" -SysparmCategory "category1"
+
+    Retrieves the elements of the ServiceNow Service Portal page for the specified Service Catalog item and category.
+
+.NOTES
+    The function constructs the endpoint URLs using the SysID and category to retrieve the Service Portal content and API data.
+    It parses the necessary elements from the JSON response and returns their names.
+
+#>
+
     $SN_SP_Item_Content = (New-ServiceNowWebRequest -Endpoint "/sp?id=sc_cat_item&sys_id=$SysID&sysparm_category=$SysparmCategory").Content
     $SN_SP_PortalID = Parse-String -String $SN_SP_Item_Content -StartStr "`"portal_id = '" -EndStr "'"
 
@@ -749,6 +773,30 @@ param(
 }
 
 function Get-ServiceNowServices {
+<#
+.SYNOPSIS
+    Retrieves and updates the ServiceNow services JSON file.
+
+.DESCRIPTION
+    This function checks if the ServiceNow services JSON file exists at the specified path.
+    If it exists, the function imports the content of the JSON file into a global variable.
+    If the file does not exist, it prompts the user to download the latest JSON file and updates the content.
+
+.PARAMETER PSScriptRoot
+    The root directory of the script, used to determine the path to the ServiceNow services JSON file.
+
+.EXAMPLE
+    Get-ServiceNowServices
+
+    Checks for the existence of the ServiceNow services JSON file, imports its content if available, or prompts the user to download and update the file if not found.
+
+.NOTES
+    If the JSON file is not found, the function prompts the user to download the latest version.
+    Upon confirmation, it calls the `Update-ServiceNowServices` function to download and update the file.
+    Once the file exists, the function imports the content of the JSON file into a global variable.
+
+#>
+
     $global:ServiceNowServicesFilePath = "$($PSScriptRoot)\ServiceNow_Services.json"
 
     if(Test-Path $ServiceNowServicesFilePath){
@@ -770,6 +818,25 @@ function Get-ServiceNowServices {
 }
 
 function Get-ServiceNowStats {
+<#
+.SYNOPSIS
+    Retrieves and parses instance statistics from ServiceNow.
+
+.DESCRIPTION
+    This function fetches instance statistics from the ServiceNow `stats.do` endpoint and parses the HTML response to extract and format the relevant information.
+    It builds a string containing the parsed statistics and returns it.
+
+.EXAMPLE
+    Get-ServiceNowStats
+
+    Retrieves the instance statistics from ServiceNow and returns a formatted string with the parsed information.
+
+.NOTES
+    The function processes the HTML response from the `stats.do` endpoint, extracting text between specific HTML tags (`<br/>` and `<strong>`), and compiles the extracted information into a formatted string.
+    This string is then returned for display or further processing.
+
+#>
+
     $SN_Stats_MasterStr = "*****Instance Information*****`n"
     $SN_Stats = New-ServiceNowWebRequest -Endpoint "/stats.do" -REST
     $StartPos = $SN_Stats.IndexOf("<br/>")
@@ -793,6 +860,32 @@ function Get-ServiceNowStats {
 
 function Get-ServiceNowUserUnique{
 param($FirstName,$LastName)
+<#
+.SYNOPSIS
+    Retrieves a unique ServiceNow user based on the first and last name.
+
+.DESCRIPTION
+    This function searches for a ServiceNow user by their first and last name.
+    If multiple users are found, it prompts the user to select one from the list.
+    If a single user is found, it returns that user.
+
+.PARAMETER FirstName
+    The first name of the ServiceNow user to search for.
+
+.PARAMETER LastName
+    The last name of the ServiceNow user to search for.
+
+.EXAMPLE
+    Get-ServiceNowUserUnique -FirstName "John" -LastName "Doe"
+
+    Searches for a ServiceNow user with the first name "John" and the last name "Doe". If multiple users are found, it prompts for selection. If one user is found, it returns that user.
+
+.NOTES
+    If multiple users are found, the function enters a loop prompting the user to select a user from the list by entering the corresponding index.
+    It handles invalid inputs and continues prompting until a valid selection is made.
+
+#>
+
     $UserSearch = Get-ServiceNowRecord -RecordType User -FirstName $FirstName -LastName $LastName
     if($UserSearch.Count -ne 1){
         while($True){
@@ -1194,7 +1287,48 @@ $File="",
     }
 }
 
+#From here and below still need comment based help
 function New-ServiceNowSession{
+<#
+.SYNOPSIS
+    Establishes a new session with a ServiceNow instance.
+
+.DESCRIPTION
+    This function initiates a session with a ServiceNow instance using various authentication methods such as username/password or certificate authentication.
+    It retrieves and sets current user settings and provides session details upon successful connection.
+
+.PARAMETER Server
+    The ServiceNow instance server URL. If not provided, the function checks for an existing global variable $ServiceNow_Server.
+
+.PARAMETER Username
+    The username for basic authentication.
+
+.PARAMETER Pass
+    The password for basic authentication.
+
+.PARAMETER CertificateAuth
+    A switch parameter to enable certificate-based authentication.
+
+.EXAMPLE
+    New-ServiceNowSession -Server "myinstance.service-now.com" -Username "admin" -Pass "mypassword"
+    
+    Establishes a new session with the specified ServiceNow instance using the provided username and password.
+
+.EXAMPLE
+    New-ServiceNowSession -Server "myinstance.service-now.com" -CertificateAuth $Cert
+    
+    Establishes a new session with the specified ServiceNow instance using certificate-based authentication.
+
+.NOTES
+    - The function handles URL normalization by removing protocols and trailing slashes.
+    - Retrieves a G_CK token for login if found in the login page content.
+    - After successful authentication, retrieves and displays user profile details.
+    - Adds an X-UserToken header to the session for subsequent requests.
+    - Sets a global variable $ServiceNow_Session_Expires_Minutes to track session expiration.
+    - Calls the function New-SNSessionRefresher to refresh the session periodically.
+
+#>
+
 param(
     $Server,
     $Username,
@@ -1531,6 +1665,26 @@ $Query
 }
 
 function Update-ServiceNowCategories {
+<#
+.SYNOPSIS
+    Updates the ServiceNow categories and their subcategories by fetching the latest data from ServiceNow and saving it to a JSON file.
+
+.DESCRIPTION
+    This function updates the ServiceNow categories JSON file by fetching the latest categories and their corresponding subcategories from ServiceNow.
+    It retrieves the categories using the `Get-ServiceNowList` function and then iterates through each category to fetch its subcategories.
+    The updated data is saved to a JSON file located at `$PSScriptRoot\ServiceNow_Categories.json`.
+
+.EXAMPLE
+    Update-ServiceNowCategories
+
+    Fetches the latest categories and subcategories from ServiceNow and updates the ServiceNow categories JSON file.
+
+.NOTES
+    The function constructs a query to retrieve the subcategories for each category and stores the data in an ordered hash table.
+    The data is then converted to JSON format and saved to a file at the specified path.
+
+#>
+
     $global:SN_CATsFilePath = "$($PSScriptRoot)\ServiceNow_Categories.json"
     $i = 0
     $SN_CategoryListHash = [ordered]@{}
