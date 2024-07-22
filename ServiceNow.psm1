@@ -1842,43 +1842,70 @@ function Update-ServiceNowCategories {
 function Update-ServiceNowGroups {
 <#
 .SYNOPSIS
-    Retrieves the ServiceNow groups and saves them to a JSON file.
+    Updates the ServiceNow groups and saves them to a JSON file.
 
 .DESCRIPTION
-    This function retrieves the list of user groups from the ServiceNow instance using the New-ServiceNowWebRequest function. It filters the results to include only groups with non-empty names, selects relevant fields (name, sys_id, and manager), sorts the groups by name, and saves the results to a JSON file.
+    This function retrieves the list of user groups from the ServiceNow instance using the New-ServiceNowWebRequest function.
+    It filters the results to include only groups with non-empty names, selects relevant fields (name, sys_id, and manager), sorts the groups by name, and saves the results to a JSON file.
+    After updating the file, it calls the Get-ServiceNowGroups function to load the updated groups.
 
 .NOTES
     - The function saves the JSON file to the path specified by the variable $SN_GroupsFilePath.
     - The global variable $SN_GroupsFilePath is set to the file path of the JSON file in the script root directory.
     - The function uses the New-ServiceNowWebRequest function to send a GET request to the ServiceNow instance and retrieve the groups in JSON format.
     - The JSON file is overwritten if it already exists.
+    - The function calls Get-ServiceNowGroups after updating the JSON file.
 
 .EXAMPLE
     Update-ServiceNowGroups
 
-    Updates the list of ServiceNow groups and saves them to the specified JSON file.
+    Updates the list of ServiceNow groups and saves them to the specified JSON file, then calls Get-ServiceNowGroups to load the updated groups.
 #>
 
     $global:SN_GroupsFilePath = "$($PSScriptRoot)\ServiceNow_Groups.json"
     (New-ServiceNowWebRequest -Endpoint "/sys_user_group_list.do?JSONv2" -REST).records  | where {$_.name -ne "" -and $_.name -ne $null} | select name,sys_id,manager | sort name | ConvertTo-Json | Out-File $SN_GroupsFilePath -Force
+    Get-ServiceNowGroups
     Write-Host "Service Now Groups JSON file updated successfully!" -ForegroundColor Green
 }
 
 function Update-ServiceNowRecord{
 <#
 .SYNOPSIS
-Updates a single or multiple fields for a record in ServiceNow.
+    Updates one or more fields for a record in ServiceNow.
+
+.DESCRIPTION
+    The Update-ServiceNowRecord function updates specified fields for a given record in ServiceNow.
+    It supports various record types and accepts either a SysID or a Ticket Number to identify the record.
+    The fields to be updated are provided as a hashtable.
+
+.PARAMETER RecordType
+    The type of ServiceNow record to update. Accepted values are: ChangeRequest, ChangeTask, CustomerServiceCase, Group, Incident, Request, RequestItem, ScheduledTask, User, ConfigurationItem.
+
+.PARAMETER SysID
+    The SysID of the record to be updated. If not provided, the function attempts to retrieve it using the Ticket Number.
+
+.PARAMETER TicketNum
+    The Ticket Number of the record to be updated. If provided, the function retrieves the corresponding SysID.
+
+.PARAMETER BodyParams
+    A hashtable of fields and values to update for the record. This parameter is mandatory.
 
 .EXAMPLE
-#Example 1: Create body paramters to update and pass to Update-ServiceNowRecord command.
-$BodyParams = @{
-"state" = "Resolved"
-"close_code"="Duplicate"
-"close_notes"="This incident is a duplicate of INC1234567"
-}
+    $BodyParams = @{
+        "state" = "Resolved"
+        "close_code" = "Duplicate"
+        "close_notes" = "This incident is a duplicate of INC1234567"
+    }
+    $Update_SN_record = Update-ServiceNowRecord -RecordType "Incident" -TicketNum "INC8675309" -BodyParams $BodyParams
 
-$Update_SN_record = Update-ServiceNowRecord -RecordType "Incident" -TicketNum "INC8675309" -BodyParams $BodyParams
+.NOTES
+    - The function uses the New-ServiceNowWebRequest function to send a POST request to the ServiceNow instance with the update details.
+    - If both SysID and TicketNum are provided, SysID takes precedence.
+    - If TicketNum is provided, the function retrieves the SysID using the Get-ServiceNowRecord function.
+    - The function handles record types through a switch statement to set the appropriate endpoint URL.
+    - The function converts the hashtable of BodyParams to JSON format before sending the request.
 #>
+
 param(
 [Parameter(Mandatory)]
 [ValidateSet("ChangeRequest","ChangeTask","CustomerServiceCase","Group","Incident","Request","RequestItem","ScheduledTask","User","ConfigurationItem")]
@@ -1935,9 +1962,28 @@ $BodyParams
 }
 
 function Update-ServiceNowServices {
+<#
+.SYNOPSIS
+    Updates the ServiceNow Services JSON file with the latest data from ServiceNow.
+
+.DESCRIPTION
+    The Update-ServiceNowServices function retrieves the latest list of services from ServiceNow and updates the ServiceNow_Services.json file.
+    This file contains the name and sys_id of each service.
+
+.NOTES
+    - The function uses the New-ServiceNowWebRequest function to send a REST request to the ServiceNow instance and retrieve the list of services.
+    - The services are filtered to exclude any with empty or null names.
+    - The results are sorted by name and then converted to JSON format.
+    - The JSON data is written to the ServiceNow_Services.json file in the script's root directory.
+    - A success message is displayed upon successful update.
+
+.EXAMPLE
+    # Example: Update the ServiceNow Services JSON file
+    Update-ServiceNowServices
+    #>
+
     $global:ServiceNowServicesFilePath = "$($PSScriptRoot)\ServiceNow_Services.json"
     $ServiceNow_Services = (New-ServiceNowWebRequest -Endpoint "/cmdb_ci_service_list.do?JSONv2&sysparm_target=incident.business_service" -REST).records | where {$_.name -ne "" -and $_.name -ne $null} | select name,sys_id | sort name | ConvertTo-Json | Out-File $ServiceNowServicesFilePath -Force
-    #$ServiceNow_Services = (Invoke-RestMethod -UseBasicParsing -Uri "https://$ServiceNow_Server/cmdb_ci_service_list.do?JSONv2&sysparm_target=incident.business_service" -WebSession $ServiceNow_Session -Headers @{"X-UserToken"=$SN_User_Token}).records | where {$_.name -ne "" -and $_.name -ne $null} | select name,sys_id | sort name | ConvertTo-Json | Out-File $ServiceNowServicesFilePath -Force
     Write-Host "Service Now Services JSON file updated successfully!" -ForegroundColor Green
 }
 
@@ -1945,9 +1991,6 @@ Export-ModuleMember -Function Add-ServiceNowAttachment
 Export-ModuleMember -Function Close-ServiceNowIncident
 Export-ModuleMember -Function Close-ServiceNowSession
 Export-ModuleMember -Function Confirm-ServiceNowSession
-#Export-ModuleMember -Function Get-AuthCertificate
-#Export-ModuleMember -Function Get-File
-#Export-ModuleMember -Function Get-MimeType
 Export-ModuleMember -Function Get-ServiceNowCategories
 Export-ModuleMember -Function Get-ServiceNowGroups
 Export-ModuleMember -Function Get-ServiceNowRecord
@@ -1958,7 +2001,6 @@ Export-ModuleMember -Function Get-ServiceNowUserUnique
 Export-ModuleMember -Function New-ServiceNowIncident
 Export-ModuleMember -Function New-ServiceNowIncidentAdvanced
 Export-ModuleMember -Function Get-ServiceNowList
-#Export-ModuleMember -Function New-ServiceNowSCTask           #This functions needs additional review/recoding
 Export-ModuleMember -Function New-ServiceNowSession
 Export-ModuleMember -Function New-ServiceNowWebRequest
 Export-ModuleMember -Function New-ServiceNowWorkNote
