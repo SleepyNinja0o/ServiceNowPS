@@ -1716,11 +1716,33 @@ param($Name,$Fields="first_name;last_name;user_name;email")
 function Search-ServiceNowRecord{
 <#
 .SYNOPSIS
-Executes a query for records in ServiceNow.
+    Executes a query for records in ServiceNow.
+
+.DESCRIPTION
+    This function searches for records of specified types in the ServiceNow instance. It constructs the appropriate URL for the record type and executes the query using the New-ServiceNowWebRequest function. The results are returned as records.
+
+.PARAMETER RecordType
+    The type of record to search for. This parameter is mandatory and accepts values such as ChangeRequest, ChangeTask, CustomerServiceCase, Group, Incident, Request, RequestItem, ScheduledTask, User, and ConfigurationItem.
+
+.PARAMETER Query
+    The query string used to search for records. This parameter is mandatory and should follow ServiceNow's query syntax.
 
 .EXAMPLE
-$Search_SN_Record = Search-ServiceNowRecords -RecordType "User" -Query "first_name=Abel^last_name=Smith"
+    $Search_SN_Record = Search-ServiceNowRecord -RecordType "User" -Query "first_name=Abel^last_name=Smith"
+    
+    Searches for user records where the first name is "Abel" and the last name is "Smith".
+
+.EXAMPLE
+    $Search_SN_Record = Search-ServiceNowRecord -RecordType "Incident" -Query "state=1^priority=2"
+    
+    Searches for incident records where the state is "1" and the priority is "2".
+
+.NOTES
+    - The function sends a GET request to the ServiceNow instance using the New-ServiceNowWebRequest function.
+    - The response is expected to be in JSON format.
+    - If the query does not return a valid response, an error message is displayed and the function exits.
 #>
+
 param(
 [Parameter(Mandatory)]
 [ValidateSet("ChangeRequest","ChangeTask","CustomerServiceCase","Group","Incident","Request","RequestItem","ScheduledTask","User","ConfigurationItem")]
@@ -1818,8 +1840,26 @@ function Update-ServiceNowCategories {
 }
 
 function Update-ServiceNowGroups {
+<#
+.SYNOPSIS
+    Retrieves the ServiceNow groups and saves them to a JSON file.
+
+.DESCRIPTION
+    This function retrieves the list of user groups from the ServiceNow instance using the New-ServiceNowWebRequest function. It filters the results to include only groups with non-empty names, selects relevant fields (name, sys_id, and manager), sorts the groups by name, and saves the results to a JSON file.
+
+.NOTES
+    - The function saves the JSON file to the path specified by the variable $SN_GroupsFilePath.
+    - The global variable $SN_GroupsFilePath is set to the file path of the JSON file in the script root directory.
+    - The function uses the New-ServiceNowWebRequest function to send a GET request to the ServiceNow instance and retrieve the groups in JSON format.
+    - The JSON file is overwritten if it already exists.
+
+.EXAMPLE
+    Update-ServiceNowGroups
+
+    Updates the list of ServiceNow groups and saves them to the specified JSON file.
+#>
+
     $global:SN_GroupsFilePath = "$($PSScriptRoot)\ServiceNow_Groups.json"
-    #(Invoke-RestMethod -Uri "https://$ServiceNow_Server/sys_user_group_list.do?JSONv2" -WebSession $ServiceNow_Session).records | where {$_.name -ne "" -and $_.name -ne $null} | select name,sys_id,manager | sort name | ConvertTo-Json | Out-File $SN_GroupsFilePath -Force
     (New-ServiceNowWebRequest -Endpoint "/sys_user_group_list.do?JSONv2" -REST).records  | where {$_.name -ne "" -and $_.name -ne $null} | select name,sys_id,manager | sort name | ConvertTo-Json | Out-File $SN_GroupsFilePath -Force
     Write-Host "Service Now Groups JSON file updated successfully!" -ForegroundColor Green
 }
