@@ -1,6 +1,6 @@
 # ServiceNowPS
 This is a PowerShell module for ServiceNow based on the JSONv2 web service and other Front End API calls:</br>
-https://docs.servicenow.com/bundle/tokyo-application-development/page/integrate/inbound-other-web-services/concept/c_JSONv2WebService.html</br></br>
+[ServiceNow JSONv2 Web Service](https://docs.servicenow.com/bundle/washingtondc-api-reference/page/integrate/inbound-other-web-services/concept/c_JSONv2WebService.html)</br></br>
 The JSONv2 web service does not require API access, it only requires the "ITIL" user role.</br>(Basically, if you can create/view tickets, this should work for you!)</br></br>
 
 ## Examples
