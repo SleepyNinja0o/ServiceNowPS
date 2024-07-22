@@ -1287,7 +1287,6 @@ $File="",
     }
 }
 
-#From here and below still need comment based help
 function New-ServiceNowSession{
 <#
 .SYNOPSIS
@@ -1488,6 +1487,49 @@ param(
 }
 
 function New-ServiceNowWebRequest{
+<#
+.SYNOPSIS
+    Sends a web request to a ServiceNow instance.
+
+.DESCRIPTION
+    This function sends an HTTP web request to a specified ServiceNow instance endpoint using the provided method, headers, content type, and body.
+    It handles retries for failed requests and ensures the session is confirmed before making the request.
+
+.PARAMETER Endpoint
+    The endpoint for the ServiceNow web request.
+
+.PARAMETER Method
+    The HTTP method to use for the request. Valid values are "GET" and "POST". The default is "GET".
+
+.PARAMETER Headers
+    Custom headers to include in the web request.
+
+.PARAMETER ContentType
+    The content type of the web request.
+
+.PARAMETER Body
+    The body content for the web request.
+
+.PARAMETER REST
+    A switch to indicate if the request should be sent using REST (Invoke-RestMethod) instead of HTTP (Invoke-WebRequest).
+
+.EXAMPLE
+    New-ServiceNowWebRequest -Endpoint "/incident.do?JSONv2&sysparm_query=number=INC457389" -REST
+    
+    Sends a GET request to the specified ServiceNow endpoint using REST.
+
+.EXAMPLE
+    New-ServiceNowWebRequest -Endpoint "/incident.do" -Method "POST" -ContentType "application/json" -Body $jsonBody -Headers $customHeaders
+    
+    Sends a POST request to the specified ServiceNow endpoint with custom headers and JSON body content.
+
+.NOTES
+    - The function will confirm the ServiceNow session by calling Confirm-ServiceNowSession if $ServiceNow_Session is not set.
+    - If the request fails, it retries up to three times with a 2-second pause between attempts.
+    - If all retries fail, it prompts the user to retry the request manually.
+
+#>
+
 param(
     $Endpoint,
     [ValidateSet("GET","POST")]$Method="GET",
@@ -1528,6 +1570,50 @@ param(
 }
 
 function New-ServiceNowWorkNote{
+<#
+.SYNOPSIS
+    Adds a work note to a specified ServiceNow record.
+
+.DESCRIPTION
+    This function adds a work note to a specified ServiceNow record.
+    The record can be of various types such as ChangeRequest, ChangeTask, Incident, Request, RequestItem, or ScheduledTask.
+    The work note can be added using either the SysID or the TicketNumber of the record.
+
+.PARAMETER RecordType
+    The type of record to which the work note will be added. Valid values are:
+    - ChangeRequest
+    - ChangeTask
+    - Incident
+    - Request
+    - RequestItem
+    - ScheduledTask
+    - CustomerServiceCase
+
+.PARAMETER SysID
+    The SysID of the record. This parameter is optional if the TicketNumber is provided.
+
+.PARAMETER TicketNumber
+    The ticket number of the record. This parameter is optional if the SysID is provided.
+
+.PARAMETER Note
+    The work note to be added to the record. This parameter is mandatory.
+
+.EXAMPLE
+    New-ServiceNowWorkNote -RecordType "Incident" -SysID "INC7474750" -Note "This is a test work note."
+    
+    Adds a work note to the Incident record with the specified SysID.
+
+.EXAMPLE
+    New-ServiceNowWorkNote -RecordType "RequestItem" -TicketNumber "RITM0012345" -Note "Work note added via script."
+    
+    Adds a work note to the RequestItem record with the specified TicketNumber.
+
+.NOTES
+    - If the TicketNumber is provided, the SysID is retrieved using the Get-ServiceNowRecord function.
+    - The function constructs a JSON body with the work note and sends it to the appropriate endpoint using the New-ServiceNowWebRequest function.
+
+#>
+
 param(
 [Parameter(Mandatory=$true)]
 [ValidateSet("ChangeRequest","ChangeTask","Incident","Request","RequestItem","ScheduledTask")]
@@ -1593,6 +1679,36 @@ function Restore-ServiceNowHeaders{
 }
 
 function Search-ServiceNowCustomer{
+<#
+.SYNOPSIS
+    Searches for ServiceNow customer records based on a given name.
+
+.DESCRIPTION
+    This function searches for ServiceNow customer records using the provided name.
+    It returns specified fields or default fields if none are provided.
+
+.PARAMETER Name
+    The name of the customer to search for. This parameter is mandatory.
+
+.PARAMETER Fields
+    The fields to be returned in the search results. This parameter is optional. If not provided, the default fields returned are "first_name;last_name;user_name;email".
+
+.EXAMPLE
+    Search-ServiceNowCustomer -Name "John Doe"
+    
+    Searches for customers with the name "John Doe" and returns the default fields.
+
+.EXAMPLE
+    Search-ServiceNowCustomer -Name "Jane Doe" -Fields "first_name;last_name;phone"
+    
+    Searches for customers with the name "Jane Doe" and returns the specified fields: "first_name", "last_name", and "phone".
+
+.NOTES
+    - The function sends a POST request to the ServiceNow instance using the New-ServiceNowWebRequest function.
+    - The response is parsed as XML and the child nodes are returned.
+    - The search returns a maximum of 15 results.
+#>
+
 param($Name,$Fields)
     if($Fields -ne "" -and $Fields -ne $null){
         $ReturnFields = $Fields
